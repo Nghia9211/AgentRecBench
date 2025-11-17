@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
 
-
 def num_tokens_from_string(string: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")
     try:
@@ -56,7 +55,7 @@ class MyRecommendationAgent(RecommendationAgent):
         super().__init__(llm=llm)
         self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm)
 
-    def workflow(self, task_type):
+    def workflow(self):
         """
         Simulate user behavior
         Returns:
@@ -170,11 +169,9 @@ class MyRecommendationAgent(RecommendationAgent):
                 # Lấy chuỗi danh sách cuối cùng tìm được
                 last_match_str = matches[-1]
                 
-                # Dùng regex một lần nữa để lấy nội dung bên trong dấu ngoặc
                 content_match = re.search(r"\[(.*)\]", last_match_str, re.DOTALL)
                 content = content_match.group(1)
 
-                # Tách các phần tử bằng dấu phẩy
                 items = [item.strip().strip("'\"") for item in content.split(',')]
                 processed_list = [item for item in items if item]
 
@@ -224,10 +221,10 @@ if __name__ == "__main__":
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
     " -Task Type- Argument define only for RecHacker Baseline"
     " Option 1: No Threading "
-    agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=False, task_type = task_set)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=False, task_type = task_set)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    # agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 10)
+    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 10)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()

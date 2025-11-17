@@ -8,9 +8,6 @@ from langchain_core.vectorstores import VectorStore
 from langchain_core.retrievers import BaseRetriever
 import os
 
-# ==============================================================================
-# ĐỊNH NGHĨA LỚP MemoryDILU (Dán lại lớp của bạn ở đây để file có thể chạy độc lập)
-# ==============================================================================
 class MemoryARAG:
     """
     Một lớp quản lý bộ nhớ dài hạn cho hệ thống RAG, sử dụng một Vector Store.

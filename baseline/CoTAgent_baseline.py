@@ -86,7 +86,6 @@ Here is the information you have:
 --- CANDIDATE ITEMS ---
 {item_list}
 
-
 --- YOUR TASK ---
 Based on all the information above, analyze the user's preferences and the attributes of the candidate items.
 Your final output MUST BE list of strings, where each string is an item_id from the candidate list.
@@ -137,22 +136,22 @@ if __name__ == "__main__":
     " Set LLM client - CHANGE API KEY "
     load_dotenv()
     " -- OPEN AI -- "
-    # openai_api_key = os.getenv("OPEN_API_KEY")
-    # simulator.set_llm(OpenAILLM(api_key=openai_api_key))
+    openai_api_key = os.getenv("OPEN_API_KEY")
+    simulator.set_llm(OpenAILLM(api_key=openai_api_key))
 
     " -- GROQ -- "
-    groq_api_key = os.getenv("GROQ_API_KEY2") # Change API-KEY HERE
-    simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
+    # groq_api_key = os.getenv("GROQ_API_KEY2") # Change API-KEY HERE
+    # simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
 
 
     " Run evaluation "
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
 
     " Option 1: No Threading "
-    agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=False)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    # agent_outputs = simulator.run_simulation(number_of_tasks=5, enable_threading=True, max_workers = 10)
+    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 10)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()

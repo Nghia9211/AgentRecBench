@@ -17,8 +17,9 @@ __*/
 TODO
 db/
 EDA/
-plug-in/ARAG/.env
+plugin/ARAG/.env
+plugin/ARAG/user*
 baseline/.env
 baseline/results/*
-dataset/
+dataset/*
 baseline/vector_database/*

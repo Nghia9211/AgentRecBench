@@ -40,13 +40,13 @@ class MyRecommendationAgent(RecommendationAgent):
         self.reasoning = ReasoningIO(profile_type_prompt='', memory=None,llm=self.llm)
 
         " --- IF USE OPENAI, UNCOMMENT THIS --- "
-        openai_api_key = os.getenv("OPEN_API_KEY")
-        sync_client = OpenAI(api_key=openai_api_key)
-        sync_embeddings = OpenAIEmbeddings(client=sync_client.embeddings)
-        self.memory = MemoryDILU(llm=self.llm, embedding_model = sync_embeddings)
+        # openai_api_key = os.getenv("OPEN_API_KEY")
+        # sync_client = OpenAI(api_key=openai_api_key)
+        # sync_embeddings = OpenAIEmbeddings(client=sync_client.embeddings)
+        # self.memory = MemoryDILU(llm=self.llm, embedding_model = sync_embeddings)
         " --- IF USE OPENAI, UNCOMMENT THIS --- "
 
-        # self.memory = MemoryDILU(llm=self.llm)
+        self.memory = MemoryDILU(llm=self.llm)
 
     def workflow(self):
         """
@@ -95,12 +95,12 @@ class MyRecommendationAgent(RecommendationAgent):
             current_trajectory = str(his)
             self.memory.addMemory(current_trajectory)
             # print("Saved history to memory.")
-            print(f"History Review {i}: {his} \n\n")
+            # print(f"History Review {i}: {his} \n\n")
         # print(f"Candidate List : {self.task['candidate_list']}")
 
         query_scenario = f"History review of {self.task['user_id']}"
         retrieved_memory = self.memory.retriveMemory(query_scenario)
-        print(f"Retrieved Memory : {retrieved_memory} \n\n")
+        # print(f"Retrieved Memory : {retrieved_memory} \n\n")
 
         task_description = f"""
 You are a recommendation agent. Your task is to recommend items for a user based on their profile, historical reviews, and a list of candidate items.
@@ -146,9 +146,9 @@ Do not include any other text, explanations, or markdown formatting around the l
 
 if __name__ == "__main__":
     " Choose Dataset " 
-    task_set = "yelp" 
+    # task_set = "yelp" 
     # task_set = "amazon"
-    # task_set = "goodreads"
+    task_set = "goodreads"
     
     
     " Load Dataset and simulator "
@@ -167,12 +167,12 @@ if __name__ == "__main__":
     load_dotenv()
 
     " -- OPEN AI -- "
-    # openai_api_key = os.getenv("OPEN_API_KEY")
-    # simulator.set_llm(OpenAILLM(api_key=openai_api_key))
+    openai_api_key = os.getenv("OPEN_API_KEY")
+    simulator.set_llm(OpenAILLM(api_key=openai_api_key))
 
     " -- GROQ -- "
-    groq_api_key = os.getenv("GROQ_API_KEY3") # Change API-KEY HERE
-    simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
+    # groq_api_key = os.getenv("GROQ_API_KEY3") # Change API-KEY HERE
+    # simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
 
 
     " Set Agent"
@@ -183,10 +183,10 @@ if __name__ == "__main__":
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
 
     " Option 1: No Threading "
-    agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=False)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=1, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    # agent_outputs = simulator.run_simulation(number_of_tasks=5, enable_threading=True, max_workers = 10)
+    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 10)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()
