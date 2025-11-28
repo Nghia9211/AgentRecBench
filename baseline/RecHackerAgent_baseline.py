@@ -8,7 +8,7 @@ from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase,Re
 import re
 import logging
 import time
-
+import argparse
 import os
 
 from dotenv import load_dotenv
@@ -95,18 +95,28 @@ class MyRecommendationAgent(RecommendationAgent):
                     user = encoding.decode(encoding.encode(user)[:12000])
                 # print(user)
             elif 'item' in sub_task['description']:
-                for n_bus in range(len(self.task['candidate_list'])):
-                    item = self.interaction_tool.get_item(item_id=self.task['candidate_list'][n_bus])
+                for item_id in self.task['candidate_list']:
+                    item = self.interaction_tool.get_item(item_id=item_id)
 
-                    # FILTERED ITEMS #
-                    keys_to_extract = ['item_id', 'name','stars','review_count','attributes','title', 'average_rating', 'rating_number','description','ratings_count','title_without_series']
-                    filtered_item = {key: item[key] for key in keys_to_extract if key in item}
-                    item_list.append(filtered_item)
-                # print(f"Item_list : {item_list}")
-                # for i, item in enumerate(item_list) :
-                #     print(f"ITEM {i} : {item}\n\n")
+                    if item:  
+                        # FILTERED ITEMS #
+                        keys_to_extract = ['item_id', 'name','stars','review_count','attributes','title', 'average_rating', 'rating_number','description','ratings_count','title_without_series']
+                        filtered_item = {key: item[key] for key in keys_to_extract if key in item}
+                        item_list.append(filtered_item)
+                    else:
+                        print(f"Warning: No data found for item_id: {item_id}. Skipping.")
             elif 'review' in sub_task['description']:
-                history_review = str(self.interaction_tool.get_reviews(user_id=self.task['user_id']))
+                all_reviews = self.interaction_tool.get_reviews(user_id=self.task['user_id'])
+                
+                candidate_ids = set(self.task['candidate_list'])
+                
+                filtered_reviews = [
+                    r for r in all_reviews 
+                    if r.get('item_id') not in candidate_ids
+                ]
+                
+                history_review = str(filtered_reviews)
+                
                 input_tokens = num_tokens_from_string(history_review)
                 if input_tokens > 12000:
                     encoding = tiktoken.get_encoding("cl100k_base")
@@ -115,7 +125,7 @@ class MyRecommendationAgent(RecommendationAgent):
                 pass
         # print(f"History Review : {history_review} \n\n")
         # print(f"Candidate List : {self.task['candidate_list']}")
-
+    
         # Dummy Core Workflow
         task_description = f'''
         ’You are a real human user on {task_type}, a platform for crowd-sourced
@@ -127,9 +137,7 @@ class MyRecommendationAgent(RecommendationAgent):
         Now you need to rank the following 20 {task_item}: {self.task['candidate_list']}
         according to their match degree to your preference. The information of the
         above 20 candidate {task_item} is as follows: 
-        [’item_id’, ’name’, ’stars’,
-        ’review_count’, ’attributes’, ’title’, ’average_rating’, ’rating_number’,
-        ’description’, ’ratings_count’...]. 
+        {item_list}
         Your final output should be ONLY a
         ranked {task_item} list of {self.task['candidate_list']} with the following format, DO
         NOT introduce any other {task_item} ids!
@@ -185,20 +193,26 @@ class MyRecommendationAgent(RecommendationAgent):
             return ['']
 
 if __name__ == "__main__":
-    " Choose Dataset " 
-    # task_set = "yelp" 
-    task_set = "amazon"
-    # task_set = "goodreads"
+    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with DummyAgent")
+    parser.add_argument(
+        '--task_set', 
+        type=str, 
+        default='amazon', 
+        choices=['amazon', 'yelp', 'goodreads'],
+        help='Name of the dataset to use (amazon, yelp, goodreads)'
+    )
     
-    
+
+    args = parser.parse_args()
+    task_set = args.task_set
     " Load Dataset and simulator "
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True) 
 
 
     " Load scenarios - Classic "
-    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/classic/{task_set}/tasks", groundtruth_dir=f"../dataset/task/classic/{task_set}/groundtruth")
+    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/classic/{task_set}/tasks", groundtruth_dir=f"../dataset/task/classic/{task_set}/groundtruth")
     " Load scenarios - User Cold Start "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/user_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/user_cold_start/{task_set}/groundtruth")
+    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/user_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/user_cold_start/{task_set}/groundtruth")
     " Load scenarios - Item Cold Start "
     # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/item_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/item_cold_start/{task_set}/groundtruth")
 
@@ -209,12 +223,12 @@ if __name__ == "__main__":
     load_dotenv()
 
     " -- OPEN AI -- "
-    # openai_api_key = os.getenv("OPEN_API_KEY")
-    # simulator.set_llm(OpenAILLM(api_key=openai_api_key))
+    openai_api_key = os.getenv("OPEN_API_KEY")
+    simulator.set_llm(OpenAILLM(api_key=openai_api_key))
 
     " -- GROQ -- "
-    groq_api_key = os.getenv("GROQ_API_KEY3") # Change API-KEY HERE
-    simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
+    # groq_api_key = os.getenv("GROQ_API_KEY3") # Change API-KEY HERE
+    # simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
 
 
     " Run evaluation "
@@ -228,7 +242,7 @@ if __name__ == "__main__":
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()
-    with open(f'./results/evaluation_results_RecHacker_{task_set}.json', 'w') as f:
+    with open(f'./results/user_coldstart/evaluation_results_RecHacker_{task_set}.json', 'w') as f:
         json.dump(evaluation_results, f, indent=4)
 
     print(f"The evaluation_results is :{evaluation_results}")
