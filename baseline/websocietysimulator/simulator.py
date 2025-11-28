@@ -9,7 +9,7 @@ from .llm import LLMBase
 from .agent.recommendation_agent import RecommendationAgent
 from .tasks.simulation_task import SimulationTask
 from .tasks.recommendation_task import RecommendationTask
-
+import re
 logger = logging.getLogger("websocietysimulator")
 
 class Simulator:
@@ -92,9 +92,42 @@ class Simulator:
                 else:
                     raise ValueError(f"Unsupported task type: {task_type}")
 
-            with open(groundtruth_path, 'r') as f:
-                groundtruth_data = json.load(f)
+            # with open(groundtruth_path, 'r') as f:
+            #     groundtruth_data = json.load(f)
                 
+                            # --- BẮT ĐẦU ĐOẠN CODE ĐÃ SỬA ---
+            with open(groundtruth_path, 'r') as f:
+                content = f.read().strip()
+                try:
+                    # Trường hợp 1: File chuẩn JSON
+                    groundtruth_data = json.loads(content)
+                except json.JSONDecodeError:
+                    try:
+                        # Trường hợp 2: File bị lỗi Extra Data (nhiều object nối tiếp nhau)
+                        # Dùng Regex thêm dấu phẩy vào giữa các object: } { -> }, {
+                        fixed_content = re.sub(r'\}\s*\{', '}, {', content)
+                        # Đóng gói thành list
+                        if not fixed_content.startswith('['):
+                            fixed_content = f"[{fixed_content}]"
+                        
+                        temp_data = json.loads(fixed_content)
+                        
+                        # Nếu kết quả là list nhưng chỉ có 1 phần tử, lấy phần tử đó ra 
+                        # để khớp với format dict mà evaluator mong đợi
+                        if isinstance(temp_data, list) and len(temp_data) == 1:
+                            groundtruth_data = temp_data[0]
+                        elif isinstance(temp_data, list) and len(temp_data) > 1:
+                             # Nếu có nhiều groundtruth trong 1 file, lấy cái đầu tiên (hoặc xử lý tùy nhu cầu)
+                             logger.warning(f"Found multiple groundtruth objects in {groundtruth_file}, using the first one.")
+                             groundtruth_data = temp_data[0]
+                        else:
+                            groundtruth_data = temp_data
+
+                    except Exception as e:
+                        logger.error(f"CRITICAL: Failed to parse groundtruth file {groundtruth_file}. Content snippet: {content[:50]}...")
+                        raise e
+            # --- KẾT THÚC ĐOẠN CODE ĐÃ SỬA ---
+
             self.tasks.append(task)
             self.groundtruth_data.append(groundtruth_data)
 

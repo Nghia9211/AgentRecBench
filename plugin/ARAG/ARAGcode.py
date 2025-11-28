@@ -5,6 +5,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 
 from langchain.vectorstores import FAISS
 import operator
+import ast
 
 from typing import TypedDict, List, Any, Optional, Dict, Union, Literal, Annotated
 from pydantic import BaseModel, Field
@@ -46,10 +47,10 @@ class NLIContent(BaseModel):
     )
     rationale : str = Field(description = "Reason why grade this score")
 class RankedItem(BaseModel):
-    item_id: Union[str, int] = Field(description="The unique identifier for the item.")
-    name: str = Field(description="The name of the item.")
-    category: str = Field(description="The category of the item.")
-    description: str = Field(description="A brief description of the item.")
+    item_id: Union[str, int] = Field(description="The unique identifier.")
+    name: str = Field(description="The name of the item or business.")
+    category: str = Field(default="General", description="Category: Book, Restaurant, Product, etc.") 
+    description: str = Field(default="", description="Description.") 
 
 class ItemRankerContent(BaseModel):
     ranked_list : List[RankedItem] = Field(description="A list of items, sorted in descending order of recommendation likelihood.")
@@ -105,7 +106,6 @@ class ARAGRecommender :
         " Create Database for RAG "
         self.embedding_function = HuggingFaceEmbeddings(model_name=embed_model_name)
 
-        
         self.loaded_vector_store = FAISS.load_local(
             folder_path = data_base_path,
             embeddings = self.embedding_function,
@@ -148,38 +148,87 @@ class ARAGRecommender :
         graph.add_edge('item_ranking_agent', END)
 
         return graph.compile()
-
-    def retrieve_positive_item(self,state: RecState):
-            print("Retrive")
-            lt_ctx = state['long_term_ctx']
-            cur_ses = state['current_session']
-            candidate_list = state['candidate_list']
-            # print(f"Candidate List : {candidate_list} \n \n")
-            query = f'Long-tern Context : {lt_ctx} \n Current Session {cur_ses } \n '
-
-            sims = []
-
-            # Embed the main query once
-            query_vec = self.embedding_function.embed_query(query)
-
-            for item in candidate_list:
-                
-                # Embed the item's text
-                item_vec = self.embedding_function.embed_query(str(item))
-
-                # Calculate cosine similarity
-                sim = cosine_similarity([item_vec], [query_vec])[0][0]
-                # print(f"Cosine Similarity for item {item.get('item_id')}: {sim:.4f}")
-                sims.append((item, sim))
+    
+    def normalize_item_data(self,item: dict) -> dict:
+        """
+        Chuẩn hóa dữ liệu từ Amazon/Yelp về định dạng chung cho ARAG.
+        Đảm bảo luôn có: item_id, name, description, category.
+        """
+        # 1. Xử lý ID
+        item_id = str(item.get('item_id', item.get('sub_item_id', 'unknown_id')))
+        
+        # 2. Xử lý Name/Title
+        # Amazon có 'title', Yelp review thường không có tên quán (cần join bảng business).
+        # Nếu không có, dùng tạm ID hoặc placeholder.
+        name = item.get('title') or item.get('name') or item.get('business_name') or f"Item {item_id}"
+        
+        # 3. Xử lý Description
+        # Amazon có thể có 'description' (từ metadata). Yelp review chỉ có 'text'.
+        # Lưu ý: 'text' trong review là ý kiến user, không phải mô tả item. 
+        # Nhưng nếu thiếu description, ta có thể để trống hoặc dùng generic text.
+        raw_desc = item.get('description') or item.get('text') or ""
+        
+        # Clean description (như fix lỗi list lúc nãy)
+        if isinstance(raw_desc, list):
+            clean_desc = " ".join([str(x) for x in raw_desc])
+        else:
+            clean_desc = str(raw_desc)
             
-            # Sort by similarity score in descending order
-            sims.sort(key = lambda x: x[1], reverse = True)
+        # 4. Xử lý Category
+        # Amazon: 'type'='product', Yelp: 'type'='business'
+        category = item.get('categories') or item.get('type') or "General"
+        if isinstance(category, list):
+            category = ", ".join(category)
 
-            # Extract only the item dictionaries for the top K results
-            top_k_list = [item for item, sim in sims[:5]]
+        return {
+            "item_id": item_id,
+            "name": name,
+            "description": clean_desc,
+            "category": str(category),
+            # Giữ lại các trường gốc nếu cần cho Prompt
+            "original_data": item 
+        }
 
-            print(f"Top K List : {top_k_list} \n\n")
-            return {'top_k_candidate' : top_k_list}
+    def retrieve_positive_item(self, state: RecState):
+                print("Retrive")
+                lt_ctx = state['long_term_ctx']
+                cur_ses = state['current_session']
+                candidate_list = state['candidate_list']
+                
+                # --- CẬP NHẬT: Chuẩn hóa dữ liệu ngay đầu vào ---
+                normalized_candidates = []
+                for item in candidate_list:
+                    # Parse string to dict nếu cần (như code trước)
+                    if isinstance(item, str):
+                        try: item = ast.literal_eval(item)
+                        except: 
+                            try: item = json.loads(item)
+                            except: continue
+                    
+                    # Gọi hàm chuẩn hóa
+                    norm_item = self.normalize_item_data(item)
+                    normalized_candidates.append(norm_item)
+                # ------------------------------------------------
+
+                query = f'Long-term Context : {lt_ctx} \n Current Session {cur_ses } \n '
+                sims = []
+                query_vec = self.embedding_function.embed_query(query)
+
+                for item in normalized_candidates:
+                    # Embed dựa trên description hoặc name đã chuẩn hóa
+                    text_to_embed = f"{item['name']} {item['description']} {item['category']}"
+                    item_vec = self.embedding_function.embed_query(text_to_embed)
+                    
+                    sim = cosine_similarity([item_vec], [query_vec])[0][0]
+                    sims.append((item, sim))
+                
+                sims.sort(key = lambda x: x[1], reverse = True)
+                top_k_list = [item for item, sim in sims[:5]]
+
+                print(f"Top K List (First item): {top_k_list[0] if top_k_list else 'Empty'} \n\n")
+                
+                # Cập nhật lại candidate_list trong state thành dạng đã chuẩn hóa để các node sau dùng
+                return {'top_k_candidate' : top_k_list, 'candidate_list': normalized_candidates}
 
     def assess_nli_score(self ,state: RecState, config : Optional[RunnableConfig] = None):
         """
@@ -239,7 +288,7 @@ Produce a quantitative similarity score (from 0.0 to 10.0) and a sharp, evidence
 - DO NOT include ANY introductory text, reasoning, explanations, or markdown formatting (like ```json).
 - Your ENTIRE response must be ONLY the tool call itself.
 - You MUST provide a numeric score.
-       """
+"""
         new_blackboard_messages = []
 
         for item in top_k_candidate :
@@ -290,8 +339,8 @@ Synthesize the provided data into a coherent, natural-language user profile. Thi
 1.  **Identify Core Interests:** Extract the recurring themes, genres, styles, or patterns from the long-term context. This is the user's 'essence'.
 2.  **Clarify Immediate Goal:** Pinpoint the specific intent or task the user is trying to accomplish in their current session. This is their 'mission' right now.
 3.  **Detect Shifts (If any):** Note if the immediate goal seems to be a departure from or an exploration beyond their core historical interests.
-4.  **Synthesize into a Narrative:** Combine these elements into a succinct paragraph that describes who this user is and what they are most likely looking for at this moment. Write from a third-person perspective (e.g., "This user has a strong affinity for... However, their recent activity suggests they are currently seeking...")."""
-
+4.  **Synthesize into a Narrative:** Combine these elements into a succinct paragraph that describes who this user is and what they are most likely looking for at this moment. Write from a third-person perspective (e.g., "This user has a strong affinity for... However, their recent activity suggests they are currently seeking...").
+"""
         prompt = base_prompt.format(long_term_context = lt_ctx, current_session = cur_ses)
 
         uua_output = self.model.invoke(prompt).content
@@ -314,7 +363,6 @@ Synthesize the provided data into a coherent, natural-language user profile. Thi
 
         if not positive_item:
                 print("No positive items to summarize. Skipping.")
-                # Trả về một message rỗng để không làm gián đoạn luồng
                 return {"blackboard": [BlackboardMessage(role="ContextSummary", content="No positive items were found to summarize.")]}
 
         user_summary_msg = next((msg for msg in reversed(list(blackboard)) if msg.role == "UserUnderStanding"), None)
@@ -356,7 +404,8 @@ Generate a concise and persuasive "Context Summary". This summary must:
 1.  **Identify the 'Common Thread':** Find the shared themes, features, and characteristics that run through the candidate items. Go beyond a simple list; find the narrative that connects them.
 2.  **Prioritize by Weight (NLI Score):** Treat the NLI score as a "salience weight." Features from higher-scoring items should be emphasized more heavily in your summary.
 3.  **Build the Argument:** Connect these shared characteristics back to the user's profile. Explain *why* these features are appealing to this specific user. For example, instead of saying "The collection features sci-fi films," say "This collection leans into hard sci-fi with complex world-building, which directly aligns with the user's stated preference for thought-provoking narratives."
-4.  **Produce a single, coherent paragraph:** The final output should be a smooth, narrative-driven summary.    """
+4.  **Produce a single, coherent paragraph:** The final output should be a smooth, narrative-driven summary.    
+"""      
         prompt = base_prompt.format(user_summary=user_summary_text, items_with_scores_str=items_with_scores_str)
 
         
@@ -393,7 +442,6 @@ Generate a concise and persuasive "Context Summary". This summary must:
 
             items_to_rank_str = "\n\n".join([json.dumps(item, indent=2) for item in items_to_rank])
 
-
             base_prompt = """### ROLE ###
 You are an Elite Recommendation Ranking Expert. Your sole responsibility is to take a user profile, a context summary, and a list of PRE-VETTED, POSITIVE items, then rank them in descending order of likelihood for the user to select.
 
@@ -414,11 +462,11 @@ Think like a personal curator whose goal is to maximize user delight and engagem
 3.  **Harness the Context:** Use the "Context Summary" to understand the key appealing features of this item set and prioritize items that are the best examples of those features.
 4.  **Diversify and Delight:** If two items seem equally relevant, give a slight edge to the one that might introduce a bit of novelty or expand the user's horizons, preventing filter bubbles.
 
-### TASK ###
+### IMPORTANT TASK - MUST FOLLOW ###
 1.  Create the final ranked list of ONLY the candidate items provided to you in the `Candidate Items to Rank` section.
 2.  Write a brief but comprehensive explanation for your overall ranking strategy, especially your reasoning for the top 2-3 items.
 3.  You MUST call the `ItemRankerContent` tool with your final ranked list and explanation. Your entire response must be ONLY the tool call.
-        """
+"""
 
             prompt = base_prompt.format(
                 user_summary=user_understanding,
@@ -426,36 +474,49 @@ Think like a personal curator whose goal is to maximize user delight and engagem
                 items_to_rank_str=items_to_rank_str
             )
 
-            result_from_model = self.rank_model.invoke(prompt)
-            ranked_positive_items = result_from_model.ranked_list
+            try:
+                result_from_model = self.rank_model.invoke(prompt)
+            except:
+                result_from_model = None
+            if not result_from_model:
+                print("⚠️ Model failed. Using original order.")
+                ranked_positive_items = [
+                    RankedItem(
+                        item_id=str(i.get('item_id')),
+                        name=str(i.get('title') or i.get('name') or 'Unknown'),
+                        category="General",
+                        description=str(i.get('description') if not isinstance(i.get('description'), list) else " ".join(map(str, i['description'])))
+                    ) for i in items_to_rank
+                ]
+                # Tạo giả object kết quả để lưu vào blackboard
+                result_from_model = ItemRankerContent(ranked_list=ranked_positive_items, explanation="Fallback strategy")
+            else:
+                ranked_positive_items = result_from_model.ranked_list
 
             ranked_item_ids = {item.item_id for item in ranked_positive_items}
 
-            unranked_items_dicts = [
-                item for item in candidate_list if item['item_id'] not in ranked_item_ids
-            ]
+            unranked_items = []
+            for item in candidate_list: 
+                if str(item['item_id']) not in ranked_item_ids:
+                    unranked_items.append(
+                        RankedItem(
+                            item_id=item['item_id'],
+                            name=item['name'],
+                            category=item['category'],
+                            description=item['description'] 
+                        )
+                    )
 
-            unranked_items = [
-                RankedItem(
-                    item_id=item.get('item_id', ''),
-                    name=item.get('title', ''),
-                    category=item.get('type', 'book'), 
-                    description=item.get('description', '')
-                ) for item in unranked_items_dicts
-            ]
-
-            # Kết hợp các danh sách: danh sách đã xếp hạng của mô hình trước, theo sau là các mục còn lại.
             final_full_ranked_list = ranked_positive_items + unranked_items
 
             result =  [item.item_id for item in final_full_ranked_list]
 
-            # Thông báo gửi đến blackboard nên chứa kết quả gốc của mô hình
+
             item_ranking_message = BlackboardMessage(
                 role="ItemRanker",
-                content=result_from_model # Lưu trữ đầu ra trực tiếp của mô hình
+                content=result_from_model 
             )
 
-            # State nên được cập nhật với danh sách đầy đủ, đã được kết hợp
             return {'final_rank_list':result , 'blackboard': [item_ranking_message]}
 
     def should_generate_summary(self, state: RecState):
