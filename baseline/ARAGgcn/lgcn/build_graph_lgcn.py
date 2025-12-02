@@ -1,45 +1,65 @@
-# --- START OF FILE build_graph_gcn.py (UPDATED) ---
-
 import json
 import networkx as nx
 import torch
 import numpy as np
 import scipy.sparse as sp
+import argparse
+import os
+from utils import load_groundtruth_pairs
 
-def build_graph_with_networkx(user_file, item_file, review_file):
-    print("--- 1. INITAILIZE GRAPH NETWORKX ---")
+
+
+
+
+def build_graph_with_masking(user_file, item_file, review_file, gt_folder, output_file):
+    print("\n--- 1. INITIALIZE GRAPH NETWORKX (WITH MASKING) ---")
     G = nx.Graph() 
     
+    # 1. Load User
     print("Loading Users...")
     with open(user_file, 'r', encoding='utf-8') as f:
         for line in f:
             data = json.loads(line)
-            G.add_node(data['user_id'], node_type='user')
+            G.add_node(str(data['user_id']), node_type='user')
 
+    # 2. Load Item
     print("Loading Items...")
     with open(item_file, 'r', encoding='utf-8') as f:
         for line in f:
             data = json.loads(line)
-            G.add_node(data['item_id'], node_type='item')
+            G.add_node(str(data['item_id']), node_type='item')
 
-    print(f"Total Initialize Nodes: {G.number_of_nodes()}")
-    print("Loading Reviews (Edges)...")
-    
+    # 3. Load Mask List
+    masked_pairs = load_groundtruth_pairs(gt_folder)
+
+    # 4. Load Reviews & Apply Mask
+    print("Loading Reviews and Building Edges...")
     edge_count = 0
+    skipped_count = 0
+    
     try:
         with open(review_file, 'r', encoding='utf-8') as f:
             for line in f:
                 data = json.loads(line)
-                u = data.get('user_id')
-                i = data.get('item_id')
+                u = str(data.get('user_id'))
+                i = str(data.get('item_id'))
                 
+                # --- LOGIC MASKING ---
+                if (u, i) in masked_pairs:
+                    skipped_count += 1
+                    continue 
+                # ---------------------
+
                 if u in G and i in G:
                     G.add_edge(u, i)
                     edge_count += 1
+                
     except FileNotFoundError:
-        print("Not Found Review File .json!")
+        print("Error: Review file not found!")
+        return
 
-    print(f"Total Edges: {edge_count}")
+    print(f"Total Edges Added: {edge_count}")
+    print(f"Total Edges Masked (Skipped): {skipped_count}")
 
     print("\n--- 2. CONVERTING TO PYTORCH FORMAT ---")
     
@@ -61,7 +81,7 @@ def build_graph_with_networkx(user_file, item_file, review_file):
             if len(neighbors) > 0:
                 train_dict[node_idx] = neighbors
 
-    print(f"Detected {num_users} users.")
+    print(f"Detected {num_users} users with interactions.")
 
     print("Creating Adjacency Matrix...")
     A = nx.to_scipy_sparse_array(G_int, format='coo') 
@@ -94,10 +114,25 @@ def build_graph_with_networkx(user_file, item_file, review_file):
         'num_nodes': num_nodes
     }
     
-    torch.save(save_data, 'processed_graph_data.pt')
-    print("\n✅ Done! File saved: processed_graph_data.pt containing interaction dict.")
+    torch.save(save_data, output_file)
+    print(f"\n✅ MASKED Graph saved to: {output_file}")
+    print("You can now run 'train.py' using this file.")
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Build Masked Graph for LightGCN")
+    
+    parser.add_argument('--user_file', type=str, required=True, help='Path to user.json')
+    parser.add_argument('--item_file', type=str, required=True, help='Path to item.json')
+    parser.add_argument('--review_file', type=str, required=True, help='Path to review.json (FULL data)')
+    parser.add_argument('--gt_folder', type=str, required=True, help='Folder containing groundtruth_*.json files')
+    parser.add_argument('--output_file', type=str, default='processed_graph_masked.pt', help='Output .pt file')
 
-build_graph_with_networkx(r'C:\Users\Admin\Desktop\Document\SpeechToText\RecSystemCode\data\graph_data\user_amazon.json', 
-                          r'C:\Users\Admin\Desktop\Document\SpeechToText\RecSystemCode\data\graph_data\item_amazon.json', 
-                          r'C:\Users\Admin\Desktop\Document\SpeechToText\RecSystemCode\data\graph_data\review_amazon.json')
+    args = parser.parse_args()
+
+    build_graph_with_masking(
+        user_file=args.user_file,
+        item_file=args.item_file,
+        review_file=args.review_file,
+        gt_folder=args.gt_folder,
+        output_file=args.output_file,
+    )

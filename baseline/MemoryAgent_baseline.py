@@ -198,7 +198,6 @@ if __name__ == "__main__":
     # groq_api_key = os.getenv("GROQ_API_KEY3") # Change API-KEY HERE
     # simulator.set_llm(GroqLLM(api_key = groq_api_key ,model="meta-llama/llama-4-scout-17b-16e-instruct"))
 
-
     " Set Agent"
     simulator.set_agent(MyRecommendationAgent)
 
