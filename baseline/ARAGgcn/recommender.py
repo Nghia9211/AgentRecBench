@@ -25,16 +25,16 @@ class ARAGgcnRecommender:
             rank_model=model.with_structured_output(ItemRankerContent),
             embedding_function=self.embedding_function,
             gcn_path=gcn_model_path,
-            graph_data_path = graph_data_path
         )
         builder = GraphBuilder(agent_provider=self.agents)
         self.workflow = builder.build()
 
-    def get_recommendation(self, long_term_ctx: str, current_session: str, candidate_item: dict, nli_threshold: float = 4.0) -> RecState:
+    def get_recommendation(self, user_id :str,long_term_ctx: str, current_session: str, candidate_item: dict, nli_threshold: float = 4.0) -> RecState:
         print("🚀 STARTING NEW ARAG RECOMMENDATION RUN 🚀")
 
         run_config = {"configurable": {"nli_threshold": nli_threshold}}
         initial_state = {
+            "user_id" : user_id,
             "long_term_ctx": long_term_ctx,
             "current_session": current_session,
             "blackboard": [],

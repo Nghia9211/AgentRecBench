@@ -156,7 +156,7 @@ if __name__ == "__main__":
     model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, max_tokens = 1000)
 
     processor = ReviewProcessor(target_source = task_set)
-    arag_recommender = ARAGRecommender(model=model, data_base_path=f'C:/Users/Admin/Desktop/Document/SpeechToText/RecSystemCode/storage/item_storage_{task_set}')
+    arag_recommender = ARAGRecommender(model=model, data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}')
     
     " -- GROQ -- "
     # groq_api_key = os.getenv("GROQ_API_KEY2") # Change API-KEY HERE

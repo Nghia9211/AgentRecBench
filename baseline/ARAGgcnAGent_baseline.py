@@ -107,6 +107,7 @@ class MyRecommendationAgent(RecommendationAgent):
         current_session = processor.short_term_context
 
         final_state = arag_recommender.get_recommendation(
+        user_id=self.task['user_id'],
         long_term_ctx=long_term_ctx,
         current_session=current_session,
         nli_threshold=2.0,
@@ -160,10 +161,9 @@ if __name__ == "__main__":
     processor = ReviewProcessor(target_source = task_set)
     arag_recommender = ARAGgcnRecommender(
         model=model, 
-        data_base_path=f'C:/Users/Admin/Desktop/Document/SpeechToText/RecSystemCode/storage/item_storage_{task_set}',
+        data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}',
         embed_model_name='sentence-transformers/all-MiniLM-L6-v2',
-        gcn_model_path=f'C:/Users/Admin/Desktop/Document/SpeechToText/RecSystemCode/src/ARAGgcn/lgcn/gcn_embeddings_3hop_{task_set}.pt',
-        graph_data_path=f'C:/Users/Admin/Desktop/Document/SpeechToText/RecSystemCode/src/ARAGgcn/lgcn/processed_graph_data_{task_set}.pt'
+        gcn_model_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/src/ARAGgcn/lgcn/gcn_embeddings_3hop_{task_set}.pt',
     )
 
     

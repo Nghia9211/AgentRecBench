@@ -15,6 +15,22 @@ Produce a quantitative similarity score (from 0.0 to 10.0) and a sharp, evidence
 - **User's Current Session (Immediate Goal):**
 {current_session}
 
+### EXAMPLES (LEARN FROM THESE) ###
+
+Example 1:
+User Profile: "Loves hard sci-fi, physics, space travel."
+Item: "Star Wars: A New Hope (Fantasy/Space Opera)"
+Thinking: The user likes scientific accuracy (hard sci-fi). Star Wars is fantasy/magic in space. Similar setting, but wrong genre tone.
+Score: 4.5
+Rationale: While set in space, this contradicts the user's preference for 'hard' science and physics-based plots.
+
+Example 2:
+User Profile: "Vegan, looking for budget dinner."
+Item: "The Green Leaf (Vegan Bistro, $$)"
+Thinking: Perfectly aligns with Vegan. Price is moderate ($$), fits budget.
+Score: 9.0
+Rationale: Direct entailment with dietary restriction and matches price constraints.
+
 ### ITEM TO EVALUATE ###
 - **Item ID:** {item_id}
 - **Metadata:**
@@ -110,6 +126,9 @@ Think like a personal curator whose goal is to maximize user delight and engagem
 1.  Create the final ranked list of ONLY the candidate items provided to you in the `Candidate Items to Rank` section.
 2.  Write a brief but comprehensive explanation for your overall ranking strategy, especially your reasoning for the top 2-3 items.
 3.  You MUST call the `ItemRankerContent` tool with your final ranked list and explanation. Your entire response must be ONLY the tool call.
+
+### Example Output :
+['B07H4235V3', 'B00004W4S4', 'B01M1G6HID', 'B0B7H5H8G6', 'B00Z9TK8X6', 'B00RU75I2G', 'B0BQJ1MMQ8', 'B00II1QY9Y', 'B000M5KT5Y', 'B0B37CZCSC', 'B09JG6FLXL', 'B09QLQCS2L', 'B019IMEX44', 'B0064OJDUO', 'B0C6SM5J7R', 'B08PGCJZN6', 'B07KPX8GFP', 'B07CC7Q684', 'B09HCXSWD1', 'B008KVV546']
 """
 def create_assess_nli_score_prompt(item,lt_ctx: str,cur_ses: str,item_id)->str:
     return ASSESS_NLI_SCORE_PROMPT_TEMPLATE.format(item=item, long_term_context = lt_ctx, current_session = cur_ses, item_id = item_id)

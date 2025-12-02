@@ -32,6 +32,7 @@ class BlackboardMessage(BaseModel):
     score : Optional[float] = Field(default=None, description="Direct score associated with the message, if any.")
 
 class RecState(TypedDict):
+    user_id: Optional[str]
     long_term_ctx : str
     current_session : str
 

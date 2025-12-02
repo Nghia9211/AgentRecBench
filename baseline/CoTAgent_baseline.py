@@ -88,7 +88,7 @@ class MyRecommendationAgent(RecommendationAgent):
         # print(f"Candidate List : {self.task['candidate_list']}")
         
         task_description = f"""
-You are a recommendation agent. Your task is to recommend items for a user based on their profile, historical reviews, and a list of candidate items.
+You are a recommendation agent. Your task is to recommend items for a user a list of candidate items.
 
 Here is the information you have:
 
@@ -99,7 +99,6 @@ Here is the information you have:
 {item_list}
 
 --- YOUR TASK ---
-Based on all the information above, analyze the user's preferences and the attributes of the candidate items.
 Your final output MUST BE list of strings, where each string is an item_id from the candidate list.
 The list should be ranked from the most recommended to the least recommended item for this user.
 
