@@ -20,8 +20,10 @@ import logging
 import time
 import argparse
 from dotenv import load_dotenv
-from plugin.ARAG.SplitHistoryReview import ReviewProcessor
-from ARAGgcn.recommender import ARAGgcnRecommender
+
+from plugin.src.ARAGgcn.recommender import ARAGgcnRecommender 
+from plugin.src.ARAGgcn.processing_input import ReviewProcessor
+
 
 logging.basicConfig(level=logging.INFO)
 

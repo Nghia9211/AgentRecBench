@@ -20,8 +20,10 @@ import logging
 import time
 
 from dotenv import load_dotenv
-from plugin.ARAG.ARAGcode import ARAGRecommender ,RecState, BlackboardMessage, ItemRankerContent ,RankedItem , NLIContent
-from plugin.ARAG.SplitHistoryReview import ReviewProcessor
+from plugin.src.ARAG.recommender import ARAGRecommender 
+from plugin.src.ARAG.processing_input import ReviewProcessor
+
+
 logging.basicConfig(level=logging.INFO)
 
 from langchain_groq import ChatGroq
@@ -98,7 +100,7 @@ class MyRecommendationAgent(RecommendationAgent):
             else:
                 pass
         
-
+        processor.load_reviews(filtered_reviews)
         processor.process_and_split()
 
         long_term_ctx = processor.long_term_context
@@ -107,7 +109,7 @@ class MyRecommendationAgent(RecommendationAgent):
         final_state = arag_recommender.get_recommendation(
         long_term_ctx=long_term_ctx,
         current_session=current_session,
-        nli_threshold=2.0,
+        nli_threshold=4.5,
         candidate_item = item_list )
         
         result = None
@@ -167,14 +169,14 @@ if __name__ == "__main__":
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
 
     " Option 1: No Threading "
-    # agent_outputs = simulator.run_simulation(number_of_tasks=2, enable_threading=False)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=5, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
     agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 5)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()
-    with open(f'./results/user_coldstart/evaluation_results_ARAG_{task_set}.json', 'w') as f:
+    with open(f'./results/user_coldstart/evaluation_results_ARAG_fixretrieve_{task_set}.json', 'w') as f:
         json.dump(evaluation_results, f, indent=4)
 
     print(f"The evaluation_results is :{evaluation_results}")

@@ -106,7 +106,7 @@ class MyRecommendationAgent(RecommendationAgent):
                     else:
                         print(f"Warning: No data found for item_id: {item_id}. Skipping.")
             elif 'review' in sub_task['description']:
-                all_reviews = self.interaction_tool.get_reviews(user_id=self.task['user_id'])
+                all_reviews = self.interaction_tool.get_reviews(user_id=self.task['user_id']) 
                 
                 candidate_ids = set(self.task['candidate_list'])
                 
