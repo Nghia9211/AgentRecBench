@@ -2,7 +2,7 @@ import uuid
 import operator
 from datetime import datetime, timezone
 from typing import TypedDict, List, Any, Optional, Dict, Union, Literal, Annotated
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,field_validator
 
 AgentRole = Literal["UserUnderStanding", "NaturalLanguageInference", "ItemRanker", "ContextSummary"]
 class NLIContent(BaseModel):
@@ -17,8 +17,11 @@ class NLIContent(BaseModel):
 class RankedItem(BaseModel):
     item_id: Union[str, int] = Field(description="The unique identifier.")
     name: str = Field(description="The name of the item or business.")
-    category: str = Field(default="General", description="Category: Book, Restaurant, Product, etc.") 
     description: str = Field(default="", description="Description.") 
+    
+    @field_validator('item_id', mode='before')
+    @classmethod
+    def transform_id(cls, v): return str(v) 
 
 class ItemRankerContent(BaseModel):
     ranked_list : List[RankedItem] = Field(description="A list of items, sorted in descending order of recommendation likelihood.")
@@ -32,6 +35,8 @@ class BlackboardMessage(BaseModel):
     score : Optional[float] = Field(default=None, description="Direct score associated with the message, if any.")
 
 class RecState(TypedDict):
+    idx:int
+    task_set:str
     user_id: Optional[str]
     long_term_ctx : str
     current_session : str
@@ -44,5 +49,4 @@ class RecState(TypedDict):
     nli_threshold : float
 
     blackboard : Annotated[List[BlackboardMessage], operator.add]
-
     final_rank_list : Optional[list[dict]]

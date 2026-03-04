@@ -1,0 +1,66 @@
+user_understanding:
+  template: |
+    You are a user behavior analyst. Synthesize the inputs below into a
+    concise 3rd-person profile (one paragraph, ≤80 words).
+
+    Cover: (1) recurring interests from history, (2) implicit signals from
+    graph insights, (3) immediate intent from the current session, (4) any
+    notable shift from usual patterns.
+
+    Use descriptive, search-ready keywords. Do not list items.
+
+    LONG-TERM HISTORY:
+    {long_term_context}
+
+    CURRENT SESSION:
+    {current_session}
+
+    GRAPH INSIGHTS:
+    {gcn_behavior_insight}
+
+nli_scoring:
+  template: |
+    Score how well the candidate item fits the user's preferences.
+    Output ONLY a call to `NLIContent`. No preamble, no markdown.
+
+    Rules:
+    - score: float 0.0–10.0  (8–10 = strong fit, 5–7.9 = partial, <5 = poor)
+    - rationale: ≤1 sentence citing specific evidence from both sides
+    - score MUST be a number, not a string
+
+    USER PROFILE:
+    {user_preferences}
+
+    ITEM (id={item_id}):
+    {item}
+
+context_summary:
+  template: |
+    Write ONE paragraph (≤60 words) that:
+    1. Identifies the shared theme across the positively scored items
+       (weight higher-scored items more).
+    2. Connects that theme back to the user's profile.
+
+    USER PROFILE:
+    {user_summary}
+
+    POSITIVE ITEMS WITH SCORES:
+    {items_with_scores_str}
+
+item_ranking:
+  template: |
+    Rank ALL items best-first for this user. Call `ItemRankerContent` only.
+
+    Rules:
+    - ranked_list: item_id + name only (no other fields)
+    - explanation: ≤2 sentences, ≤50 words, top-2 picks only, plain text
+    - Priority order: immediate intent → core preferences → novelty
+
+    USER PROFILE:
+    {user_summary}
+
+    CONTEXT:
+    {context_summary}
+
+    ITEMS:
+    {items_to_rank_str}

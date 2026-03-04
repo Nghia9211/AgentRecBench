@@ -7,7 +7,7 @@ from .graph_builder import GraphBuilder
 from .schemas import ItemRankerContent, NLIContent, RecState
 
 
-class ARAGRecommender:
+class ARAGrawRecommender:
     def __init__(self, model: ChatGroq, data_base_path: str, embed_model_name="sentence-transformers/all-MiniLM-L6-v2"):
         self.embedding_function = HuggingFaceEmbeddings(
             model_name=embed_model_name)
@@ -28,13 +28,23 @@ class ARAGRecommender:
         builder = GraphBuilder(agent_provider=self.agents)
         self.workflow = builder.build()
 
-    def get_recommendation(self, long_term_ctx: str, current_session: str, candidate_item: dict, nli_threshold: float = 4.0) -> RecState:
+    def get_recommendation(
+            self, 
+            idx : int, 
+            task_set : str,
+            long_term_ctx: str, 
+            current_session: str, 
+            candidate_item: dict, 
+            nli_threshold: float = 4.0
+            ) -> RecState:
         print("\n" + "="*50)
         print("🚀 [START] ARAG RECOMMENDATION ENGINE")
         print("="*50)
 
         run_config = {"configurable": {"nli_threshold": nli_threshold}}
         initial_state = {
+            "idx":idx,
+            "task_set":task_set,
             "long_term_ctx": long_term_ctx,
             "current_session": current_session,
             "blackboard": [],

@@ -1,60 +1,47 @@
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Any, Callable
+import threading
+import datetime
+import csv
+import os
+import json
 
 def find_top_k_similar_items(
     query: str,
     candidate_list: List[Any],
     embedding_function: Callable,
-    top_k: int = 5
+    k: int = 5
 ) -> List[Any]:
 
-    sims = []
-    
     query_vec = embedding_function.embed_query(query)
-    
-    item_texts = [str(item) for item in candidate_list]
-    item_vectors = embedding_function.embed_documents(item_texts) 
-    
-    for item, item_vec in zip(candidate_list, item_vectors):
-        sim = cosine_similarity([item_vec], [query_vec])[0][0]
-        sims.append((item, sim))
-    
-    sims.sort(key = lambda x: x[1], reverse = True)
-    top_k_list = [item for item, sim in sims[:top_k]]
-    
-    return top_k_list
+    texts = [json.dumps(normalize_item_data(c)) for c in candidate_list]
 
-def normalize_item_data(item: dict) -> dict:
-    "Normalize Input Data for ARAG - From source : Yelp, Amazon, Goodreads"
-    item_id = str(item.get('item_id', item.get('sub_item_id', 'unknown_id')))
-    name = item.get('title') or item.get('name') or item.get('business_name') or f"Item {item_id}"
-    raw_desc = item.get('description') or item.get('text') or ""
-    if isinstance(raw_desc, list):
-        clean_desc = " ".join([str(x) for x in raw_desc])
-    else:
-        clean_desc = str(raw_desc)
-    category = item.get('categories') or item.get('type') or "General"
-    if isinstance(category, list):
-        category = ", ".join(category)
+    item_vecs = embedding_function.embed_documents(texts)
+    sims = cosine_similarity([query_vec], item_vecs)[0]
+    
+    results = sorted(zip(candidate_list, sims), key=lambda x: x[1], reverse=True)
+    return [res[0] for res in results[:k]]
+
+def normalize_item_data(item: Any) -> dict:
+    """Chuẩn hóa dữ liệu item từ nhiều nguồn khác nhau."""
+    if isinstance(item, str):
+        try: item = json.loads(item.replace("'", '"'))
+        except: return {}
 
     return {
-        "item_id": item_id,
-        "name": name,
-        "description": clean_desc,
-        "category": str(category),
-        "original_data": item 
+        "item_id": str(item.get('item_id', item.get('sub_item_id', 'unknown'))),
+        "name": item.get('title') or item.get('name') or item.get('title_without_series'),
+        "description": str(item.get('description') or item.get('attributes') or "")[:200],
+        "Rating": str(item.get('stars') or item.get('average_rating') or ""),
     }
 
-def print_agent_step(agent_name: str, message: str, data: Any = None):
-    header = f"=== [AGENT: {agent_name.upper()}] ==="
-    print(f"\n\033[94m{header}\033[0m") 
-    print(f"💬 {message}")
-    if data:
-        if isinstance(data, list):
-            print(f"📊 Items count: {len(data)}")
-            for i, item in enumerate(data[:3]): 
-                print(f"   - Item {i+1}: {item}")
-            if len(data) > 3: print("   ...")
-        else:
-            print(f"📝 Data: {data}")
-    print("\033[94m" + "="*len(header) + "\033[0m\n")
+def get_last_message(blackboard, role):
+    return next((msg for msg in reversed(blackboard) if msg.role == role), None)
+
+def get_user_understanding(state):
+    msg = get_last_message(state['blackboard'], "UserUnderStanding")
+    return msg.content if msg else ""
+
+def get_user_summary(state):
+    msg = get_last_message(state['blackboard'], "ContextSummary")
+    return msg.content if msg else ""

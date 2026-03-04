@@ -84,103 +84,72 @@ class RecReasoning(ReasoningBase):
         return reasoning_result
 
 class MyRecommendationAgent(RecommendationAgent):
-    """
-    Participant's implementation of SimulationAgent
-    """
-    def __init__(self, llm:LLMBase):
+    def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
         self.reasoning = RecReasoning(profile_type_prompt='', llm=self.llm)
 
     def workflow(self):
-        """
-        Simulate user behavior
-        Returns:
-            list: Sorted list of item IDs
-        """
-        plan = [
-         {'description': 'First I need to find user information'},
-         {'description': 'Next, I need to find item information'},
-         {'description': 'Next, I need to find review information'}
-         ]
-
-        user = ''
-        item_list = []
-        history_review = ''
-
-
-        for sub_task in plan:
-            
-            if 'user' in sub_task['description']:
-                user = str(self.interaction_tool.get_user(user_id=self.task['user_id']))
-                input_tokens = num_tokens_from_string(user)
-                if input_tokens > 12000:
-                    encoding = tiktoken.get_encoding("cl100k_base")
-                    user = encoding.decode(encoding.encode(user)[:12000])
-                print(user)
-            elif 'item' in sub_task['description']:
-                for item_id in self.task['candidate_list']:
-                    item = self.interaction_tool.get_item(item_id=item_id)
-
-                    if item:  
-                        # FILTERED ITEMS #
-                        keys_to_extract = ['item_id', 'name','stars','review_count','attributes','title', 'average_rating', 'rating_number','description','ratings_count','title_without_series']
-                        filtered_item = {key: item[key] for key in keys_to_extract if key in item}
-                        item_list.append(filtered_item)
-                    else:
-                        print(f"Warning: No data found for item_id: {item_id}. Skipping.")
-            elif 'review' in sub_task['description']:
-                all_reviews = self.interaction_tool.get_reviews(user_id=self.task['user_id'])
-                
-                candidate_ids = set(self.task['candidate_list'])
-                
-                filtered_reviews = [
-                    r for r in all_reviews 
-                    if r.get('item_id') not in candidate_ids
-                ]
-                
-                history_review = str(filtered_reviews)
-                
-                input_tokens = num_tokens_from_string(history_review)
-                if input_tokens > 12000:
-                    encoding = tiktoken.get_encoding("cl100k_base")
-                    history_review = encoding.decode(encoding.encode(history_review)[:12000])
-            else:
-                pass
-
-        # print(f"Candidate List : {self.task['candidate_list']}"
-
-        # Dummy Core Workflow
-        task_description = f'''
-        You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
-        Now you need to rank the following 20 items: {self.task['candidate_list']} according to their match degree to your preference.
-        Please rank the more interested items more front in your rank list.
-        The information of the above 20 candidate items is as follows: {item_list}.
+        current_set = task_set.lower()
         
+        # --- [DUMMY AGENT LOGIC] Platform-tailored Metadata (Trang 13) ---
+        if current_set == "amazon":
+            item_keys = ['item_id', 'name', 'stars', 'review_count', 'description']
+            rev_keys = ['item_id', 'rating', 'text', 'verified_purchase', 'timestamp'] # Thêm verified_purchase
+        elif current_set == "yelp":
+            item_keys = ['item_id', 'name', 'stars', 'review_count']
+            rev_keys = ['item_id', 'rating', 'text', 'useful', 'funny', 'cool'] # Thêm tương tác review
+        elif current_set == "goodreads":
+            item_keys = ['item_id', 'title', 'average_rating', 'review_count']
+            rev_keys = ['item_id', 'rating', 'text', 'review_date', 'votes', 'comments', 'read_status'] # Thêm metadata sách
+        else:
+            item_keys = ['item_id', 'name', 'stars']
+            rev_keys = ['item_id', 'rating', 'text']
 
-        Your final output should be ONLY a ranked item list of {self.task['candidate_list']} with the following format, DO NOT introduce any other item ids!
-        DO NOT output your analysis process!
+        # 1. Thu thập dữ liệu
+        all_reviews = self.interaction_tool.get_reviews(user_id=self.task['user_id'])
+        candidate_ids = set(self.task['candidate_list'])
+        
+        # Lọc history với metadata nâng cao
+        filtered_reviews = [
+            {k: r.get(k) for k in rev_keys if k in r}
+            for r in all_reviews if r.get('item_id') not in candidate_ids
+        ]
+        
+        history_review = str(filtered_reviews)
+        if num_tokens_from_string(history_review) > 8000:
+            encoding = tiktoken.get_encoding("cl100k_base")
+            history_review = encoding.decode(encoding.encode(history_review)[:8000])
 
-        The correct output format:
+        item_list = []
+        for item_id in self.task['candidate_list']:
+            item = self.interaction_tool.get_item(item_id=item_id)
+            if item:
+                item_list.append({k: item.get(k) for k in item_keys if k in item})
 
-        ['item id1', 'item id2', 'item id3', ...]
+        # --- [PROMPT] Theo Figure 5: DummyAgent's core workflow ---
+        task_description = f'''
+You are a real user on an online platform. Your historical item review text and stars are as follows: {history_review}. 
+Now you need to rank the following {len(self.task['candidate_list'])} items: {self.task['candidate_list']} according to their match degree to your preference.
 
-        '''
+Please rank the more interested items more front in your rank list.
+The information of the above candidate items is as follows: {item_list}.
+
+Your final output should be ONLY a ranked item list of {self.task['candidate_list']} with the following format, DO NOT introduce any other item ids!
+DO NOT output your analysis process!
+The correct output format: [Sorted Candidate Item List]
+        '''.strip()
+
         result = self.reasoning(task_description)
-        print(result)
-
+        
+        # Robust Parsing (Giống phần trước)
         try:
-            print('Meta Output:',result)
-            match = re.search(r"\[.*\]", result, re.DOTALL)
-            if match:
-                result = match.group()
-            else:
-                print("No list found.")
-            print('Processed Output:',eval(result))
-            # time.sleep(4)
-            return eval(result)
+            matches = re.findall(r"\[(.*?)\]", result, re.DOTALL)
+            if matches:
+                content = matches[-1].replace("'", "").replace('"', "")
+                return [i.strip() for i in content.split(',') if i.strip() in candidate_ids][:20]
+            return self.task['candidate_list']
         except:
-            print('format error')
-            return ['']
+            return self.task['candidate_list']
 
 
 if __name__ == "__main__":
@@ -195,20 +164,25 @@ if __name__ == "__main__":
         help='Name of the dataset to use (amazon, yelp, goodreads)'
     )
     
+    parser.add_argument(
+        '--scenario',
+        type=str,
+        default='classic',
+        choices=['classic', 'user_cold_start','item_cold_start'],
+        help='Type of scenario to run (classic, user_cold_start,item_cold_start )'
+    )
+    
 
     args = parser.parse_args()
     task_set = args.task_set
+    scenario = args.scenario
     
     " Load Dataset and simulator "
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True) 
 
-    " Load scenarios - Classic "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/classic/{task_set}/tasks", groundtruth_dir=f"../dataset/task/classic/{task_set}/groundtruth")
-    " Load scenarios - User Cold Start "
-    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/user_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/user_cold_start/{task_set}/groundtruth")
-    
-    " Load scenarios - Item Cold Start "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/item_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/item_cold_start/{task_set}/groundtruth")
+
+    " Load scenarios"
+    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/task/{scenario}/{task_set}/groundtruth")
 
     " Set Agent"
     simulator.set_agent(MyRecommendationAgent)
@@ -236,7 +210,7 @@ if __name__ == "__main__":
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()
-    with open(f'./results/user_coldstart/evaluation_results_DummyAgent_{task_set}.json', 'w') as f:
+    with open(f'./results/{scenario}/evaluation_results_DummyAgent_{task_set}.json', 'w') as f:
         json.dump(evaluation_results, f, indent=4)
 
     print(f"The evaluation_results is :{evaluation_results}")

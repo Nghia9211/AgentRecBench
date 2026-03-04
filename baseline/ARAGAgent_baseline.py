@@ -29,6 +29,10 @@ logging.basicConfig(level=logging.INFO)
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 
+
+from debug.utils.user2id import load_user_to_idx_map
+USER_TO_ID_MAP = {}
+
 def num_tokens_from_string(string: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")
     try:
@@ -43,7 +47,7 @@ class MyRecommendationAgent(RecommendationAgent):
     """
     def __init__(self, llm:LLMBase):
         super().__init__(llm=None)
-
+        self.processor = ReviewProcessor(target_source=task_set) 
 
     def workflow(self):
         """
@@ -74,7 +78,7 @@ class MyRecommendationAgent(RecommendationAgent):
                     item = self.interaction_tool.get_item(item_id=item_id)
 
                     if item:  
-                        # FILTERED ITEMS #oGDGlUbOjHxmmCh8ZYcDCg
+                        # FILTERED ITEMS 
                         keys_to_extract = ['item_id', 'name','stars','review_count','attributes','title', 'average_rating', 'rating_number','description','ratings_count','title_without_series']
                         filtered_item = {key: item[key] for key in keys_to_extract if key in item}
                         item_list.append(filtered_item)
@@ -94,19 +98,22 @@ class MyRecommendationAgent(RecommendationAgent):
                 history_review = str(filtered_reviews)
                 
                 input_tokens = num_tokens_from_string(history_review)
-                if input_tokens > 12000:
+                if input_tokens > 8000:
                     encoding = tiktoken.get_encoding("cl100k_base")
-                    history_review = encoding.decode(encoding.encode(history_review)[:12000])
+                    history_review = encoding.decode(encoding.encode(history_review)[:8000])
             else:
                 pass
         
-        processor.load_reviews(filtered_reviews)
-        processor.process_and_split()
+        self.processor.load_reviews(filtered_reviews)
+        self.processor.process_and_split()
 
-        long_term_ctx = processor.long_term_context
-        current_session = processor.short_term_context
+        long_term_ctx = self.processor.long_term_context
+        current_session = self.processor.short_term_context
 
+        current_idx = USER_TO_ID_MAP.get(self.task['user_id']) 
         final_state = arag_recommender.get_recommendation(
+        idx=current_idx,
+        task_set=task_set,
         long_term_ctx=long_term_ctx,
         current_session=current_session,
         nli_threshold=4.5,
@@ -114,7 +121,8 @@ class MyRecommendationAgent(RecommendationAgent):
         
         result = None
         result = final_state['final_rank_list']
-       
+        time.sleep(1.5)
+
         try:
             print('Meta Output:',result)
             return result
@@ -124,7 +132,7 @@ class MyRecommendationAgent(RecommendationAgent):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with DummyAgent")
+    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with ARAG Agent Retrie")
     parser.add_argument(
         '--task_set', 
         type=str, 
@@ -133,21 +141,39 @@ if __name__ == "__main__":
         help='Name of the dataset to use (amazon, yelp, goodreads)'
     )
     
+    parser.add_argument(
+        '--scenario',
+        type=str,
+        default='classic',
+        choices=['classic', 'user_cold_start','item_cold_start'],
+        help='Type of scenario to run (classic, user_cold_start,item_cold_start )'
+    )
+
+    parser.add_argument(
+        '--model',
+        type=str,
+        default='classic',
+        choices=['classic', 'user_cold_start','item_cold_start'],
+        help='Type of scenario to run (classic, user_cold_start,item_cold_start )'
+    )
+    
 
     args = parser.parse_args()
     task_set = args.task_set
+    scenario = args.scenario
+
+    csv_mapping_path = f"./debug/mappings/mapping_{scenario}_{task_set}.csv"
+
+    " MAPPING FOR DEBUG "
+    USER_TO_ID_MAP = load_user_to_idx_map(csv_mapping_path)
     
     " Load Dataset and simulator "
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True) 
 
 
-    " Load scenarios - Classic "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/classic/{task_set}/tasks", groundtruth_dir=f"../dataset/task/classic/{task_set}/groundtruth")
-    " Load scenarios - User Cold Start "
-    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/user_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/user_cold_start/{task_set}/groundtruth")
-    " Load scenarios - Item Cold Start "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/item_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/item_cold_start/{task_set}/groundtruth")
-
+    " Load scenarios"
+    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/task/{scenario}/{task_set}/groundtruth")
+    
     " Set Agent"
     simulator.set_agent(MyRecommendationAgent)
 
@@ -155,9 +181,11 @@ if __name__ == "__main__":
     load_dotenv()
     " -- OPEN AI -- "
     openai_api_key = os.getenv("OPEN_API_KEY")
-    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, max_tokens = 1000)
-
-    processor = ReviewProcessor(target_source = task_set)
+    # if args.model == 'open-ai':
+    #     model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, max_tokens = 1000)
+    # else :
+    #     model = None
+    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, max_tokens = 2000)
     arag_recommender = ARAGRecommender(model=model, data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}')
     
     " -- GROQ -- "
@@ -169,14 +197,14 @@ if __name__ == "__main__":
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
 
     " Option 1: No Threading "
-    # agent_outputs = simulator.run_simulation(number_of_tasks=5, enable_threading=False)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=10, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 5)
+    agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=False)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()
-    with open(f'./results/user_coldstart/evaluation_results_ARAG_fixretrieve_{task_set}.json', 'w') as f:
+    with open(f'./results/{scenario}/evaluation_results_ARAG_fixretrieve_{task_set}.json', 'w') as f:
         json.dump(evaluation_results, f, indent=4)
 
     print(f"The evaluation_results is :{evaluation_results}")

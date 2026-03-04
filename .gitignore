@@ -23,3 +23,8 @@ baseline/.env
 baseline/results/*
 dataset/*
 baseline/vector_database/*
+stats_*
+*.pt
+*.png
+baseline/run_baseline.bat
+baseline/run_baseline.bat

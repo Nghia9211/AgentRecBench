@@ -15,17 +15,13 @@ class NLIContent(BaseModel):
     rationale : str = Field(description = "Reason why grade this score")
 
 class RankedItem(BaseModel):
-    item_id: Union[str, int] = Field(description="The unique identifier.")
-    name: str = Field(description="The name of the item or business.")
-    category: str = Field(default="General", description="Category: Book, Restaurant, Product, etc.") 
-    description: str = Field(default="", description="Description.") 
-    @field_validator('description', mode='before')
+    item_id: Any = Field(description="The unique identifier.") 
+    name: str = Field(default="Unknown", description="The name of the item.")
+    description: Optional[str] = Field(default="")
+
+    @field_validator('item_id', mode='before')
     @classmethod
-    def ensure_string(cls, v):
-        # If the LLM returns a list instead of a string, join it or take the first element
-        if isinstance(v, list):
-            return " ".join(str(i) for i in v)
-        return v
+    def transform_id(cls, v): return str(v) 
 
 class ItemRankerContent(BaseModel):
     ranked_list : List[RankedItem] = Field(description="A list of items, sorted in descending order of recommendation likelihood.")
@@ -39,16 +35,18 @@ class BlackboardMessage(BaseModel):
     score : Optional[float] = Field(default=None, description="Direct score associated with the message, if any.")
 
 class RecState(TypedDict):
-    long_term_ctx : str
-    current_session : str
+    idx: int
+    task_set: str
+    long_term_ctx: str
+    current_session: str
 
-    candidate_list : list[dict] 
-    top_k_candidate : list[dict]
-    positive_list : list[dict] 
+    candidate_list: list[dict] 
+    top_k_candidate: list[dict]
+    positive_list: list[dict] 
+    
+    nli_scores: Dict[str, float]
+    nli_threshold: float
+    
+    blackboard: Annotated[List[BlackboardMessage], operator.add]
+    final_rank_list: Optional[list[dict]]
 
-    nli_scores : Dict[str, float]
-    nli_threshold : float
-
-    blackboard : Annotated[List[BlackboardMessage], operator.add]
-
-    final_rank_list : Optional[list[dict]]

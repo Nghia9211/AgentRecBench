@@ -29,11 +29,13 @@ class ARAGgcnRecommender:
         builder = GraphBuilder(agent_provider=self.agents)
         self.workflow = builder.build()
 
-    def get_recommendation(self, user_id :str,long_term_ctx: str, current_session: str, candidate_item: dict, nli_threshold: float = 4.0) -> RecState:
+    def get_recommendation(self,idx: int, task_set:str, user_id :str,long_term_ctx: str, current_session: str, candidate_item: dict, nli_threshold: float = 4.0) -> RecState:
         print("🚀 STARTING NEW ARAG RECOMMENDATION RUN 🚀")
 
         run_config = {"configurable": {"nli_threshold": nli_threshold}}
         initial_state = {
+            "idx":idx,
+            "task_set":task_set,
             "user_id" : user_id,
             "long_term_ctx": long_term_ctx,
             "current_session": current_session,
@@ -42,5 +44,10 @@ class ARAGgcnRecommender:
         }
         final_state = self.workflow.invoke(initial_state, config=run_config)
 
+        print("\n" + "="*50)
+        print("🏁 [COMPLETE] FINAL RECOMMENDATION RESULTS")
+        print(f"Total Ranked Items: {len(final_state.get('final_rank_list', []))}")
+        print(f"Top 3 IDs: {final_state.get('final_rank_list', [])[:3]}")
+        print("="*50 + "\n")
         print("🏁 ARAG RECOMMENDATION RUN COMPLETE 🏁")
         return final_state

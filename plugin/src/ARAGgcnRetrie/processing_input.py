@@ -40,7 +40,6 @@ class ReviewProcessor:
         self.all_reviews = input_file
         
 
-
     def process_and_split(self):
         if not self.all_reviews:
             return
@@ -59,6 +58,10 @@ class ReviewProcessor:
                 valid_reviews.append(review)
 
         self.sorted_reviews = sorted(valid_reviews, key=lambda x: x['timestamp_norm'])
+
+        MAX_HISTORY = 20 
+        if len(self.sorted_reviews) > MAX_HISTORY:
+            self.sorted_reviews = self.sorted_reviews[-MAX_HISTORY:]
 
         if not self.sorted_reviews:
             return

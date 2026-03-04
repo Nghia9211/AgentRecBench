@@ -99,9 +99,9 @@ class MyRecommendationAgent(RecommendationAgent):
                 history_review = str(filtered_reviews)
                 
                 input_tokens = num_tokens_from_string(history_review)
-                if input_tokens > 12000:
+                if input_tokens > 8000:
                     encoding = tiktoken.get_encoding("cl100k_base")
-                    history_review = encoding.decode(encoding.encode(history_review)[:12000])
+                    history_review = encoding.decode(encoding.encode(history_review)[:8000])
             else:
                 pass
         retrieved_memory = ''
@@ -161,7 +161,7 @@ The list should be ranked from the most recommended to the least recommended ite
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with DummyAgent")
+    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with Memory Agent")
     parser.add_argument(
         '--task_set', 
         type=str, 
@@ -169,23 +169,26 @@ if __name__ == "__main__":
         choices=['amazon', 'yelp', 'goodreads'],
         help='Name of the dataset to use (amazon, yelp, goodreads)'
     )
+    parser.add_argument(
+        '--scenario',
+        type=str,
+        default='classic',
+        choices=['classic', 'user_cold_start','item_cold_start'],
+        help='Type of scenario to run (classic, user_cold_start,item_cold_start )'
+    )
     
 
     args = parser.parse_args()
     task_set = args.task_set
-    
+    scenario = args.scenario
     
     " Load Dataset and simulator "
-    simulator = Simulator(data_dir=f"../dataset/output_data_all/", device="gpu", cache=True) 
+    simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True) 
 
 
-    " Load scenarios - Classic "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/classic/{task_set}/tasks", groundtruth_dir=f"../dataset/task/classic/{task_set}/groundtruth")
-    " Load scenarios - User Cold Start "
-    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/user_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/user_cold_start/{task_set}/groundtruth")
-    " Load scenarios - Item Cold Start "
-    # simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/item_cold_start/{task_set}/tasks", groundtruth_dir=f"../dataset/task/item_cold_start/{task_set}/groundtruth")
-    
+    " Load scenarios"
+    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/task/{scenario}/{task_set}/groundtruth")
+
     " Set LLM client - CHANGE API KEY "
     " Load API Key "
     load_dotenv()
@@ -213,7 +216,7 @@ if __name__ == "__main__":
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()
-    with open(f'./results/user_coldstart/evaluation_results_MemoryAgemt_{task_set}.json', 'w') as f:
+    with open(f'./results/{scenario}/evaluation_results_MemoryAgemt_{task_set}.json', 'w') as f:
         json.dump(evaluation_results, f, indent=4)
 
     print(f"The evaluation_results is :{evaluation_results}")

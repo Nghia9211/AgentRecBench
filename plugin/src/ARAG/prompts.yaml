@@ -1,0 +1,143 @@
+user_understanding:
+  template: |
+    ROLE: Expert User Behavior Analyst.
+
+    INPUT:
+    - Long-Term Context (Historical Interactions):
+    {long_term_context}
+
+    - Current Session (Recent Actions):
+    {current_session}
+
+    TASK: Produce a single, concise paragraph (3rd person) that captures:
+    1. CORE INTERESTS: Recurring themes, categories, styles, or attribute patterns from the long-term history.
+    2. IMMEDIATE INTENT: The specific goal or need driving the current session.
+    3. PREFERENCE SHIFTS: Any departure or exploration beyond established patterns.
+
+    OUTPUT FORMAT: One fluid paragraph. Use descriptive, keyword-rich language optimized for semantic search. Do NOT list items. Synthesize into a narrative like: "This user consistently gravitates toward [patterns]. Their current session signals an active search for [intent], suggesting [shift or continuation]."
+
+user_understanding_gcn:
+  template: |
+    ROLE: Behavioral Profiler merging explicit user data with implicit graph-based behavioral signals.
+
+    INPUT:
+    1. Long-Term Context (Explicit History):
+    {long_term_context}
+
+    2. Current Session (Immediate Intent):
+    {current_session}
+
+    3. Graph Collaborative Insights (Structural Behavioral Patterns):
+    {gcn_behavior_insight}
+
+    TASK: Produce a single, concise paragraph (3rd person) that fuses all three signals:
+    1. EXPLICIT PREFERENCES: Extract recurring themes and attributes from the textual history.
+    2. GRAPH-INFERRED TASTES: The Graph Insights reveal items and categories favored by structurally similar users. Extract latent interests (aesthetics, price tiers, functional attributes) the user hasn't stated explicitly. Name specific categories or item types from the Graph Insights when they reinforce or refine the explicit preferences.
+    3. INTENT ANALYSIS: Is the current session consistent with long-term patterns or a new exploration?
+    4. CONFLICT RESOLUTION: If Graph Insights diverge from explicit history, treat graph signals as hidden preferences or refined nuances — not contradictions.
+
+    OUTPUT FORMAT: One keyword-rich, search-optimized narrative paragraph. Structure as: "This user consistently seeks [Explicit Patterns]. Graph analysis of similar behavioral profiles reveals an additional affinity for [GCN-specific categories/attributes]. Their current session targets [Immediate Goal], ideally combining [Established Style] with [Graph-suggested refinement]."
+
+nli_scoring_v1:
+  template: |
+    ROLE: Recommendation Analyst performing Natural Language Inference (NLI).
+
+    TASK: Score the semantic FIT between the candidate item and user profile. Output a score (0.0–10.0) with evidence-based rationale.
+
+    USER CONTEXT:
+    - Long-Term Preferences:
+    {long_term_context}
+
+    - Current Session Goal:
+    {current_session}
+
+    CANDIDATE ITEM:
+    - Item ID: {item_id}
+    - Metadata:
+    {item}
+
+    SCORING PROCESS:
+    1. Identify the user's primary motivation and the experience they seek.
+    2. Extract the item's salient attributes, themes, and features.
+    3. Compare directly:
+       - ENTAILMENT (8.0–10.0): Item clearly matches stated preferences. Strong evidence from both user profile and item metadata.
+       - PLAUSIBLE (5.0–7.9): Reasonable connection to some user interests. Partial or indirect alignment.
+       - WEAK/CONTRADICTORY (0.0–4.9): Tenuous link, no meaningful connection, or conflicting signals.
+    4. Write a rationale citing specific evidence from both the user profile and item metadata. Quote concrete details.
+
+    CORRECT: "score": 8.5 (number)
+    INCORRECT: "score": "8.5" (string — WRONG)
+
+    OUTPUT: Call the `NLIContent` tool directly. No preamble, no markdown, no explanation outside the tool call. Your entire response = the tool call only.
+
+nli_scoring_v2:
+  template: |
+    ROLE: Recommendation Analyst performing Natural Language Inference (NLI).
+
+    TASK: Score the semantic FIT between the candidate item and the user preference summary below. Output a score (0.0–10.0) with evidence-based rationale.
+
+    USER PREFERENCE SUMMARY:
+    {user_preferences}
+
+    CANDIDATE ITEM:
+    - Item ID: {item_id}
+    - Metadata:
+    {item}
+
+    SCORING PROCESS:
+    1. Identify what the user is most likely seeking based on the preference summary.
+    2. Extract the item's salient attributes, themes, and features.
+    3. Compare directly:
+       - ENTAILMENT (8.0–10.0): Item clearly matches stated preferences. Strong evidence from both profile and item.
+       - PLAUSIBLE (5.0–7.9): Reasonable connection. Partial or indirect alignment.
+       - WEAK/CONTRADICTORY (0.0–4.9): Tenuous link, no meaningful connection, or conflicting signals.
+    4. Write a rationale citing specific evidence. Quote concrete details from the preference summary and item metadata.
+
+    CORRECT: "score": 8.5 (number)
+    INCORRECT: "score": "8.5" (string — WRONG)
+
+    OUTPUT: Call the `NLIContent` tool directly. No preamble, no markdown, no explanation outside the tool call. Your entire response = the tool call only.
+
+context_summary:
+  template: |
+    ROLE: Context Synthesizer.
+
+    TASK: Analyze the positively-rated candidate items and produce a single coherent paragraph explaining why this collection fits the user.
+
+    USER PROFILE:
+    {user_summary}
+
+    POSITIVE CANDIDATE ITEMS (with NLI scores):
+    {items_with_scores_str}
+
+    INSTRUCTIONS:
+    1. COMMON THREAD: Identify shared themes, features, and attributes across items. Find the narrative connecting them — go beyond listing.
+    2. SCORE-WEIGHTED EMPHASIS: Higher NLI scores = more prominent in your summary. Lead with the strongest-scoring items' features.
+    3. USER CONNECTION: Explain WHY these shared features appeal to this specific user. Instead of "the collection features leather bags," write "the collection centers on structured leather accessories, directly matching the user's demonstrated preference for durable, stylish everyday carry."
+    4. Output one fluid paragraph. No bullet points, no lists.
+
+item_ranking:
+  template: |
+    ROLE: Recommendation Ranking Expert.
+
+    TASK: Rank the pre-vetted positive items in descending order of purchase likelihood for this user.
+
+    USER PROFILE:
+    {user_summary}
+
+    CONTEXT SUMMARY:
+    {context_summary}
+
+    CANDIDATE ITEMS TO RANK:
+    {items_to_rank_str}
+
+    RANKING CRITERIA (in priority order):
+    1. IMMEDIATE INTENT FIT: Items most directly satisfying the user's current session goal rank highest.
+    2. LONG-TERM PREFERENCE ALIGNMENT: How well does each item match the user's established taste profile?
+    3. CONTEXT LEVERAGE: Use the Context Summary to identify the key appealing features and prioritize the best exemplars.
+    4. TIEBREAKER — SPECIFICITY OVER GENERALITY: When two items are equally relevant, prefer the one with more specific alignment to the user's stated preferences over a generically relevant item.
+
+    OUTPUT: Call the `ItemRankerContent` tool with:
+    - ranked_list: All candidate items sorted by recommendation likelihood (descending)
+    - explanation: Brief reasoning for your top 2-3 ranking decisions
+    Your entire response = the tool call only. No other text.

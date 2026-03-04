@@ -22,7 +22,7 @@ set OUTPUT_EMB=gcn_embeddings_3hop_%TASK_TYPE%.pt
 
 :: --- 3. TRAINING PHASE ---
 
-set EPOCHS=1000
+set EPOCHS=600
 set BATCH_SIZE=1024
 set LR=0.01
 set REG=1e-4

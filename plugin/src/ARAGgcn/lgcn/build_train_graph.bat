@@ -5,7 +5,7 @@ TITLE LightGCN Pipeline (Build Graph + Train)
 set BUILD_SCRIPT=build_graph_lgcn.py
 set TRAIN_SCRIPT=train.py
 
-set TASK_TYPE=goodreads
+set TASK_TYPE=yelp
 
 set BASE_PATH=C:\Users\Admin\Desktop\Document\AgenticCode\RecSystemCode\data\graph_data
 set USER_FILE=%BASE_PATH%\user_%TASK_TYPE%.json
