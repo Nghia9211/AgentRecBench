@@ -25,10 +25,11 @@ for %%c in (%choices%) do (
         @REM python MemoryAgent_baseline.py --task_set !DS! & ^
         @REM python DummyAgent_baseline.py --task_set !DS! & ^
         @REM python RecHackerAgent_baseline.py --task_set !DS! & ^
-        @REM python ARAGAgent_baseline.py --task_set !DS! & ^
-        python ARAGgcnAgent_baseline.py --task_set !DS! & ^
-        @REM python ARAGAgent_init_baseline.py --task_set !DS! & ^
-        @REM python ARAGgcnAgentRetrie_baseline.py --task_set !DS! & ^
+        
+        @REM python ARAGAgent.py --task_set !DS! & ^
+        python ARAGgcnAgent.py --task_set !DS! & ^
+        @REM python ARAGAgent_initpy --task_set !DS! & ^
+        @REM python ARAGgcnAgentRetrie.py --task_set !DS! & ^
     )
 )
 
