@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate')
     parser.add_argument('--reg', type=float, default=1e-4, help='Hệ số Regularization (Weight decay)')
     parser.add_argument('--emb_dim', type=int, default=64, help='Kích thước vector Embedding')
+    parser.add_argument('--dataset', type=str, default=None, help='Dataset Name')
     
     # System
     parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'], 
@@ -103,10 +104,9 @@ def main():
             print(f"Epoch {epoch+1:03d}/{args.epochs} | Loss: {loss.item():.4f}")
 
     print(f"Training finished in {time.time() - start_time:.2f}s")
-    plot_loss(loss_history, reg_history)
+    plot_loss(loss_history, reg_history,args.dataset)
     print("Save plot Loss Figure")
-
-    # Lưu kết quả
+    
     model.eval()
     with torch.no_grad():
         final_node_embeddings, _ = model(A_hat)

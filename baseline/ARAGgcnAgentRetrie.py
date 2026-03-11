@@ -66,6 +66,8 @@ class MyRecommendationAgent(RecommendationAgent):
         user = ''
         item_list = []
         history_review = ''
+
+        
         for sub_task in plan:
             
             if 'user' in sub_task['description']:
@@ -80,10 +82,7 @@ class MyRecommendationAgent(RecommendationAgent):
                     item = self.interaction_tool.get_item(item_id=item_id)
 
                     if item:  
-                        # FILTERED ITEMS #oGDGlUbOjHxmmCh8ZYcDCg
-                        keys_to_extract = ['item_id', 'name','stars','review_count','attributes','title', 'average_rating', 'rating_number','description','ratings_count','title_without_series']
-                        filtered_item = {key: item[key] for key in keys_to_extract if key in item}
-                        item_list.append(filtered_item)
+                        item_list.append(item)
                     else:
                         print(f"Warning: No data found for item_id: {item_id}. Skipping.")
                 # print(f"Item_list : {item_list}")
@@ -175,16 +174,22 @@ if __name__ == "__main__":
     load_dotenv()
     " -- OPEN AI -- "
     openai_api_key = os.getenv("OPEN_API_KEY")
-    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, max_tokens = 1000)
+    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1)
 
+    # arag_recommender = ARAGgcnRetrieRecommender(
+    #     model=model, 
+    #     data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}',
+    #     embed_model_name='sentence-transformers/all-MiniLM-L6-v2',
+    #     gcn_model_path=f'../plugin/src/ARAGgcnRetrie/lgcn/gcn_embeddings_3hop_{task_set}.pt',
+    # )
     arag_recommender = ARAGgcnRetrieRecommender(
         model=model, 
         data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}',
         embed_model_name='sentence-transformers/all-MiniLM-L6-v2',
-        gcn_model_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/src/ARAGgcn/lgcn/gcn_embeddings_3hop_{task_set}.pt',
+        # gcn_model_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/AgentRecBench/plugin/src/ARAGgcnRetrie/lgcn/best_model_{task_set}.pt'
+        gcn_model_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/gcn/gcn_embeddings_3hop_{task_set}.pt'
     )
 
-    
     " -- GROQ -- "
     # groq_api_key = os.getenv("GROQ_API_KEY2") # Change API-KEY HERE
     # model = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key = os.getenv("GROQ_API_KEY3"))
@@ -197,7 +202,7 @@ if __name__ == "__main__":
     # agent_outputs = simulator.run_simulation(number_of_tasks=2, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 5)
+    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 10)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()

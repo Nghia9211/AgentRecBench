@@ -7,10 +7,6 @@ import argparse
 import os
 from utils import load_groundtruth_pairs
 
-
-
-
-
 def build_graph_with_masking(user_file, item_file, review_file, gt_folder, output_file):
     print("\n--- 1. INITIALIZE GRAPH NETWORKX (WITH MASKING) ---")
     G = nx.Graph() 

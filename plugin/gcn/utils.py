@@ -69,7 +69,7 @@ def sample_bpr_batch(train_dict, num_users, num_nodes, batch_size = 1024):
             torch.tensor(pos_items),
             torch.tensor(neg_items))
 
-def plot_loss(loss_history,reg_history):
+def plot_loss(loss_history,reg_history,dataset):
     plt.figure(figsize=(12, 5))
     
     plt.subplot(1, 2, 1)
@@ -89,5 +89,5 @@ def plot_loss(loss_history,reg_history):
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig('training_loss.png') 
+    plt.savefig(f'trainingLoss\{dataset}_training_loss.png') 
     plt.show() 

@@ -1,6 +1,21 @@
 @echo off
 setlocal enabledelayedexpansion
 
+@REM 
+if exist .env (
+    for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
+        set "%%a=%%b"
+    )
+) else if exist baseline\.env (
+    for /f "usebackq tokens=1,2 delims==" %%a in ("baseline\.env") do (
+        set "%%a=%%b"
+    )
+) else (
+    echo [ERROR] Khong tim thay file .env!
+    pause
+    exit /b
+)
+
 echo =====================================================
 echo 1. CHON DATASET DE CHAY SIMULATION
 echo =====================================================
@@ -45,31 +60,29 @@ for %%d in (%ds_choices%) do (
                     echo.
                     echo [RUN %%r/%num_runs%] Dataset: !DS! ^| Scenario: !SC!
                     
-                    @REM python CoTAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python CoTMemoryAgent_baseline.py --task_set !DS! --scenario !SC!
-                    @REM python MemoryAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    python DummyAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python RecHackerAgent_baseline.py --task_set !DS! --scenario !SC!  
-                    @REM python Baseline666_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM Cap nhat duong dan baseline/ cho cac file python
+                    @REM python baseline/CoTAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python baseline/CoTMemoryAgent_baseline.py --task_set !DS! --scenario !SC!
+                    @REM python baseline/MemoryAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python baseline/DummyAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python baseline/RecHackerAgent_baseline.py --task_set !DS! --scenario !SC!  
+                    @REM python baseline/Baseline666_baseline.py --task_set !DS! --scenario !SC! 
                     
                     @REM Currently Run On Server for Test Result
-                    @REM python ARAGAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python baseline/ARAGAgent.py --task_set !DS! --scenario !SC! 
                     
-                    @REM python ARAGgcnAgent_baseline.py --task_set !DS! --scenario !SC!
+                    @REM python baseline/ARAGgcnAgent.py --task_set !DS! --scenario !SC!
                     
-                    @REM python ARAGAgent_init_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python baseline/ARAGAgent_init.py --task_set !DS! --scenario !SC! 
                     
-                    @REM python ARAGgcnAgentRetrie_baseline.py --task_set !DS! --scenario !SC! 
-                    
-                    @REM python ARAGv2.py --task_set !DS! --scenario !SC! 
+                    python baseline/ARAGgcnAgentRetrie.py --task_set !DS! --scenario !SC! 
                     
                     @REM ---------------------------------------
 
                     @REM --- LOGIC DOI TEN FILE TU DONG ---
-                    @REM Tim file .json trong thu muc results/!SC!/ co ten bat dau bang evaluation_results_
-                    @REM va ket thuc bang !DS!.json, dong thoi KHONG chua chu "_run"
+                    @REM Tim file .json trong thu muc baseline/results/!SC!/
                     
-                    set "TARGET_DIR=./results/!SC!"
+                    set "TARGET_DIR=./baseline/results/!SC!"
                     set "FOUND_FILE="
                     
                     for /f "delims=" %%f in ('dir /b "!TARGET_DIR!\evaluation_results_*_!DS!.json" 2^>nul') do (
@@ -92,9 +105,9 @@ for %%d in (%ds_choices%) do (
         
                         move /y "!OLD_PATH!" "!NEW_PATH!"
                     ) else (
-                        echo [WARNING] Khong tim thay file ket qua moi de doi ten.
+                        echo [WARNING] Khong tim thay file ket qua moi tai !TARGET_DIR! de doi ten.
                     )
-                )
+                }
             )
         )
     )
