@@ -176,18 +176,12 @@ if __name__ == "__main__":
     openai_api_key = os.getenv("OPEN_API_KEY")
     model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1)
 
-    # arag_recommender = ARAGgcnRetrieRecommender(
-    #     model=model, 
-    #     data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}',
-    #     embed_model_name='sentence-transformers/all-MiniLM-L6-v2',
-    #     gcn_model_path=f'../plugin/src/ARAGgcnRetrie/lgcn/gcn_embeddings_3hop_{task_set}.pt',
-    # )
+
     arag_recommender = ARAGgcnRetrieRecommender(
         model=model, 
-        data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}',
+        data_base_path=f'../plugin/storage/item_storage_{task_set}',
         embed_model_name='sentence-transformers/all-MiniLM-L6-v2',
-        # gcn_model_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/AgentRecBench/plugin/src/ARAGgcnRetrie/lgcn/best_model_{task_set}.pt'
-        gcn_model_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/gcn/gcn_embeddings_3hop_{task_set}.pt'
+        gcn_model_path=f'../plugin/gcn/gcn_embedding/gcn_embeddings_3hop_{task_set}.pt'
     )
 
     " -- GROQ -- "

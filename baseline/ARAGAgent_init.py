@@ -173,9 +173,10 @@ if __name__ == "__main__":
     load_dotenv()
     " -- OPEN AI -- "
     openai_api_key = os.getenv("OPEN_API_KEY")
-    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1, max_tokens = 1000)
+    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1)
 
-    arag_recommender = ARAGrawRecommender(model=model, data_base_path=f'C:/Users/Admin/Desktop/Document/AgenticCode/RecSystemCode/storage/item_storage_{task_set}')
+    arag_recommender = ARAGrawRecommender(model=model, 
+            data_base_path=f'../plugin/storage/item_storage_{task_set}')
     
     " -- GROQ -- "
     # groq_api_key = os.getenv("GROQ_API_KEY2") # Change API-KEY HERE
