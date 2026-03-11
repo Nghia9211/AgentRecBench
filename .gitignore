@@ -28,3 +28,5 @@ stats_*
 *.png
 baseline/run_baseline.bat
 baseline/run_baseline.bat
+*.faiss
+*.pkl
