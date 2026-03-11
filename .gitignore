@@ -20,6 +20,9 @@ EDA/
 plugin/ARAG/.env
 plugin/ARAG/user*
 baseline/.env
+baseline/report.py
+baseline/testReport.py
+baseline/EDA.py
 baseline/results/*
 dataset/*
 baseline/vector_database/*
