@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-@REM 
+@REM K
 if exist .env (
     for /f "usebackq tokens=1,2 delims==" %%a in (".env") do (
         set "%%a=%%b"
@@ -11,19 +11,19 @@ if exist .env (
         set "%%a=%%b"
     )
 ) else (
-    echo [ERROR] Khong tim thay file .env!
+    echo [ERROR] Not Found .env!
     pause
     exit /b
 )
 
 echo =====================================================
-echo 1. CHON DATASET DE CHAY SIMULATION
+echo 1. Choose Dataset to Run Simulator
 echo =====================================================
 echo [1] amazon
 echo [2] goodreads
 echo [3] yelp
 echo.
-set /p ds_choices="Nhap lua chon dataset (Vi du: 1 2): "
+set /p ds_choices="Select Dataset (Ex: 1 2): "
 
 echo.
 echo =====================================================
@@ -33,10 +33,12 @@ echo [1] classic
 echo [2] user_cold_start
 echo [3] item_cold_start
 echo.
-set /p sc_choices="Nhap lua chon scenario (Vi du: 1 2 3): "
+set /p sc_choices="Select scenario (Ex: 1 2 3): "
 
 echo.
-set /p num_runs="Nhap so lan lap moi thi nghiem (Vi du: 5): "
+set /p num_runs="Enter number of experiments to run : (Ex: 5): "
+
+pushd baseline
 
 for %%d in (%ds_choices%) do (
     set "DS="
@@ -55,39 +57,31 @@ for %%d in (%ds_choices%) do (
                 echo.
                 echo [STARTING] Dataset: !DS! ^| Scenario: !SC!
                 
-                @REM Vong lap chay n lan de lay ket qua trung binh
                 for /L %%r in (1,1,%num_runs%) do (
                     echo.
                     echo [RUN %%r/%num_runs%] Dataset: !DS! ^| Scenario: !SC!
-                    
-                    @REM Cap nhat duong dan baseline/ cho cac file python
-                    @REM python baseline/CoTAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python baseline/CoTMemoryAgent_baseline.py --task_set !DS! --scenario !SC!
-                    @REM python baseline/MemoryAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python baseline/DummyAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python baseline/RecHackerAgent_baseline.py --task_set !DS! --scenario !SC!  
-                    @REM python baseline/Baseline666_baseline.py --task_set !DS! --scenario !SC! 
+
+                    @REM python CoTAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python CoTMemoryAgent_baseline.py --task_set !DS! --scenario !SC!
+                    @REM python MemoryAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python DummyAgent_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM python RecHackerAgent_baseline.py --task_set !DS! --scenario !SC!  
+                    @REM python Baseline666_baseline.py --task_set !DS! --scenario !SC! 
                     
                     @REM Currently Run On Server for Test Result
-                    @REM python baseline/ARAGAgent.py --task_set !DS! --scenario !SC! 
+                    @REM python ARAGAgent.py --task_set !DS! --scenario !SC! 
                     
-                    @REM python baseline/ARAGgcnAgent.py --task_set !DS! --scenario !SC!
+                    @REM python ARAGgcnAgent.py --task_set !DS! --scenario !SC!
                     
-                    @REM python baseline/ARAGAgent_init.py --task_set !DS! --scenario !SC! 
+                    @REM python ARAGAgent_init.py --task_set !DS! --scenario !SC! 
                     
-                    python baseline/ARAGgcnAgentRetrie.py --task_set !DS! --scenario !SC! 
-                    
-                    @REM ---------------------------------------
+                    python ARAGgcnAgentRetrie.py --task_set !DS! --scenario !SC! 
 
-                    @REM --- LOGIC DOI TEN FILE TU DONG ---
-                    @REM Tim file .json trong thu muc baseline/results/!SC!/
-                    
-                    set "TARGET_DIR=./baseline/results/!SC!"
+                    set "TARGET_DIR=./results/!SC!"
                     set "FOUND_FILE="
                     
                     for /f "delims=" %%f in ('dir /b "!TARGET_DIR!\evaluation_results_*_!DS!.json" 2^>nul') do (
                         set "FILENAME=%%f"
-                        @REM Kiem tra neu file chua co hau to _run thi moi doi ten
                         echo !FILENAME! | findstr /v "_run" >nul
                         if !errorlevel! == 0 (
                             set "FOUND_FILE=%%f"
@@ -96,7 +90,6 @@ for %%d in (%ds_choices%) do (
 
                     if defined FOUND_FILE (
                         set "OLD_PATH=!TARGET_DIR!\!FOUND_FILE!"
-                        @REM Tach ten file va duoi file
                         for %%A in ("!OLD_PATH!") do (
                             set "NAME_ONLY=%%~nA"
                             set "EXT_ONLY=%%~xA"
@@ -105,13 +98,16 @@ for %%d in (%ds_choices%) do (
         
                         move /y "!OLD_PATH!" "!NEW_PATH!"
                     ) else (
-                        echo [WARNING] Khong tim thay file ket qua moi tai !TARGET_DIR! de doi ten.
+                        echo [WARNING] Not Found Result File to change name.
                     )
-                }
+                )
             )
         )
     )
 )
+
+@REM 
+popd
 
 echo.
 echo =====================================================
