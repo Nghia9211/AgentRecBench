@@ -4,7 +4,6 @@ from typing import Optional
 from langgraph.graph import END
 from langchain_core.runnables import RunnableConfig
 import ast
-import tiktoken
 from .prompts import *
 from .schemas import (BlackboardMessage,
                           RankedItem, RecState)
@@ -18,42 +17,6 @@ class ARAGAgents:
         self.score_model = score_model
         self.rank_model = rank_model
         self.embedding_function = embedding_function
-        self.encoding = tiktoken.get_encoding("cl100k_base")
-        self.max_context_tokens = 8000  # Keep under 16k context limit for safety
-        
-    def _truncate_context_by_tokens(self, data_list, max_tokens=None):
-        """
-        Truncate a list of review/context items to fit within token limit.
-        Returns a truncated list and the token count of the truncated content.
-        """
-        if max_tokens is None:
-            max_tokens = self.max_context_tokens
-            
-        if not data_list:
-            return [], 0
-            
-        # Convert list to string representation
-        content_str = json.dumps(data_list, ensure_ascii=False)
-        tokens = self.encoding.encode(content_str)
-        
-        if len(tokens) <= max_tokens:
-            return data_list, len(tokens)
-        
-        # Truncate items one by one until we fit
-        truncated_list = []
-        current_tokens = 0
-        
-        for item in data_list:
-            item_str = json.dumps(item, ensure_ascii=False)
-            item_tokens = len(self.encoding.encode(item_str))
-            
-            if current_tokens + item_tokens > max_tokens:
-                break
-            
-            truncated_list.append(item)
-            current_tokens += item_tokens
-        
-        return truncated_list, current_tokens
 
     def _get_gt_path(self, state):
         # return f"./dataset/task/user_cold_start/{state['task_set']}/groundtruth"
@@ -63,19 +26,7 @@ class ARAGAgents:
         lt_ctx = state['long_term_ctx']
         cur_ses = state['current_session']
 
-        # Truncate long-term context to fit within token limits
-        # Reserve tokens for current_session, prompt template, and response
-        lt_ctx_truncated, lt_tokens = self._truncate_context_by_tokens(
-            lt_ctx, 
-            max_tokens=self.max_context_tokens - 500  # Reserve 500 tokens for session + prompt
-        )
-        
-        # Current session should contain just the most recent review
-        cur_ses_truncated = cur_ses[-1:] if cur_ses else []  # Keep only the last item
-        
-        print(f"\n[Token Management] Long-term context: {lt_tokens} tokens (truncated from {len(lt_ctx)} to {len(lt_ctx_truncated)} items)")
-        
-        prompt = create_summary_user_behavior_prompt(lt_ctx = lt_ctx_truncated, cur_ses = cur_ses_truncated)
+        prompt = create_summary_user_behavior_prompt(lt_ctx = lt_ctx, cur_ses = cur_ses)
         response = self.model.invoke(prompt)
         uua_output = response.content
 
@@ -220,17 +171,8 @@ class ARAGAgents:
 
             print(f"✅ [DEBUG] Items to rank count: {len(items_to_rank)}")
             print(f"✅ [DEBUG] User Summary Length: {len(user_understanding)}")
-            
-            # Truncate items to rank if necessary to fit token limits
-            items_to_rank_truncated, items_tokens = self._truncate_context_by_tokens(
-                items_to_rank,
-                max_tokens=4000  # Reserve tokens for summaries and prompt
-            )
-            
-            if len(items_to_rank_truncated) < len(items_to_rank):
-                print(f"⚠️ [Token Manager] Truncated items from {len(items_to_rank)} to {len(items_to_rank_truncated)} (tokens: {items_tokens})")
 
-            items_to_rank_str = json.dumps(items_to_rank_truncated, indent=2, ensure_ascii=False)
+            items_to_rank_str = json.dumps(items_to_rank, indent=2, ensure_ascii=False)
 
             prompt = create_item_ranking_prompt(
                 user_summary=user_understanding,
