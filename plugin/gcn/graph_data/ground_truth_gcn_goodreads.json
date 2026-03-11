@@ -1,0 +1,802 @@
+[
+    {
+        "user_id": "4cbecbc15af3db041a8e0f594c642bb5",
+        "item_id": "25165245"
+    },
+    {
+        "user_id": "dfd3df2c0d0c65978875d58a2a346f1f",
+        "item_id": "6339101"
+    },
+    {
+        "user_id": "c987231e16b4f468aef811516652a3b0",
+        "item_id": "561535"
+    },
+    {
+        "user_id": "1f7b5b16ac0131e4b54511a2ecf32aaa",
+        "item_id": "7872794"
+    },
+    {
+        "user_id": "d946a9aaa488924227a587c91564a484",
+        "item_id": "23223164"
+    },
+    {
+        "user_id": "972316b863ee015c2b9cbfa01388476e",
+        "item_id": "320390"
+    },
+    {
+        "user_id": "1e3148b3814666ce2bd737cafb6dc8cd",
+        "item_id": "563852"
+    },
+    {
+        "user_id": "1dcc10935c0022c1bd9c7a3067b883c8",
+        "item_id": "1350646"
+    },
+    {
+        "user_id": "751efd615712748ea54bd36da6e521aa",
+        "item_id": "16074420"
+    },
+    {
+        "user_id": "d6914e61ac59e5028b590a1877fd6179",
+        "item_id": "25762109"
+    },
+    {
+        "user_id": "1d4cfe50e5d3250972b8721bf8ff9fbc",
+        "item_id": "5137043"
+    },
+    {
+        "user_id": "b0186e605b96ff83d4feb9cb4999d03e",
+        "item_id": "25986326"
+    },
+    {
+        "user_id": "b81217edb14cbff40258afdfaab7a8ac",
+        "item_id": "13494908"
+    },
+    {
+        "user_id": "806483fde2745285a7e37e3f46396baf",
+        "item_id": "31679377"
+    },
+    {
+        "user_id": "723a2a35783fadad2a4f2e00c5e639d7",
+        "item_id": "18850623"
+    },
+    {
+        "user_id": "ace565772ed1f3ce591d5b6e0f336aef",
+        "item_id": "18919816"
+    },
+    {
+        "user_id": "43902299629506119f5a5bc1cb6bc195",
+        "item_id": "35838459"
+    },
+    {
+        "user_id": "aa2ecf7bd8b6834301f54881683bbef0",
+        "item_id": "1767779"
+    },
+    {
+        "user_id": "0fa3508ef4ccd655bcf47c12740b7187",
+        "item_id": "16457709"
+    },
+    {
+        "user_id": "d0d8188f233366ab4980ee9456bc3f79",
+        "item_id": "30128"
+    },
+    {
+        "user_id": "34acef4524ac96e0660bce8e9e7af88b",
+        "item_id": "6111016"
+    },
+    {
+        "user_id": "7dfc7b6dc84c9aca9f10107ef6ce9d31",
+        "item_id": "28696068"
+    },
+    {
+        "user_id": "d256673f7072998e2f176d245c7f1f60",
+        "item_id": "33313117"
+    },
+    {
+        "user_id": "d16f31d90cf1dfda3f09cea8e6fbc105",
+        "item_id": "27246414"
+    },
+    {
+        "user_id": "b06579a78434e24b1bcda45285dc8069",
+        "item_id": "914963"
+    },
+    {
+        "user_id": "04795476e73eae6d0cc85a38a44326f0",
+        "item_id": "15729195"
+    },
+    {
+        "user_id": "d2892a74103b3dfe94b7121380963919",
+        "item_id": "1222031"
+    },
+    {
+        "user_id": "8f1cb6a77b8748cccb0869d3d779ec7c",
+        "item_id": "10586274"
+    },
+    {
+        "user_id": "545670347cee2545587831be12536d93",
+        "item_id": "13321913"
+    },
+    {
+        "user_id": "91d3b0be8a89c35b536dec1cad7b21f3",
+        "item_id": "18811404"
+    },
+    {
+        "user_id": "aeada51312c0f5625c52b549a13c92c8",
+        "item_id": "399600"
+    },
+    {
+        "user_id": "a2d6dd1685e5aa0a72c9410f8f55e056",
+        "item_id": "19321462"
+    },
+    {
+        "user_id": "81c93420876eac8c92478944d63ea4b0",
+        "item_id": "29471051"
+    },
+    {
+        "user_id": "a7eb85b520d7e4c528ad01030278a2ae",
+        "item_id": "6249455"
+    },
+    {
+        "user_id": "7670dd1b596d93e95ebda08d99721f74",
+        "item_id": "1453722"
+    },
+    {
+        "user_id": "ebc6393c0eb2db5ab9ac45403bd5d9ed",
+        "item_id": "24109190"
+    },
+    {
+        "user_id": "bbd018e674d51596e46b6b132e05b499",
+        "item_id": "20426855"
+    },
+    {
+        "user_id": "bd3bb20d14364ac6ba5a63266d7747fa",
+        "item_id": "1881288"
+    },
+    {
+        "user_id": "9789ceae0435130c2ce57da0eaad21e3",
+        "item_id": "24998995"
+    },
+    {
+        "user_id": "276c569dfeda0525ea7acd42ac113169",
+        "item_id": "1031759"
+    },
+    {
+        "user_id": "4c7838b380d007a7dc162d55717366f4",
+        "item_id": "31700707"
+    },
+    {
+        "user_id": "a9ae5cae2ff4db4877d08c7d001c1f3e",
+        "item_id": "34516661"
+    },
+    {
+        "user_id": "c7a493d6cbfb8e219ea98110cc43096a",
+        "item_id": "835032"
+    },
+    {
+        "user_id": "6c88981c6a94dc3c4d23cbde514efaaf",
+        "item_id": "601191"
+    },
+    {
+        "user_id": "25546dc24e232458b36f0942bf1dad3f",
+        "item_id": "2272466"
+    },
+    {
+        "user_id": "28c44efc066600c9e31680c4f81426c2",
+        "item_id": "34852852"
+    },
+    {
+        "user_id": "91c8d2c86c541d7318aaaa0dac630243",
+        "item_id": "1346592"
+    },
+    {
+        "user_id": "1a4eeeddcf390be6d3820fde01986abf",
+        "item_id": "6283767"
+    },
+    {
+        "user_id": "2a51426b2df337ff8eae7846217ad083",
+        "item_id": "31945168"
+    },
+    {
+        "user_id": "42ac6b08b1ccf4635aa380df5b65771d",
+        "item_id": "2510489"
+    },
+    {
+        "user_id": "31e68d624494766df47fe5ad228c47c0",
+        "item_id": "1901355"
+    },
+    {
+        "user_id": "e3476c55351c4c4bf92e0e0078f87ab5",
+        "item_id": "26020181"
+    },
+    {
+        "user_id": "b3339e93450363e6fc61e60f5ba022bf",
+        "item_id": "1917656"
+    },
+    {
+        "user_id": "89f7ab72d9505cd2b2e068d05d00483e",
+        "item_id": "11955264"
+    },
+    {
+        "user_id": "fbc8562d1972c78d2a4081adde1ad18f",
+        "item_id": "27154633"
+    },
+    {
+        "user_id": "0ef7fce7d8ecf9eb6d38995af4aaa9a9",
+        "item_id": "22021280"
+    },
+    {
+        "user_id": "c618fa79fe421b5c054b7ded093b05be",
+        "item_id": "1446834"
+    },
+    {
+        "user_id": "d5e40a0fc67af6836d49df2eafd8e427",
+        "item_id": "26258898"
+    },
+    {
+        "user_id": "e193213aea9ed470c91eb6f01cf1cb56",
+        "item_id": "2850502"
+    },
+    {
+        "user_id": "aba305f58894101d7b7121998826c92f",
+        "item_id": "35134229"
+    },
+    {
+        "user_id": "712ba14a1b9a64aad0250b2142fa64e1",
+        "item_id": "11085440"
+    },
+    {
+        "user_id": "bc550c2f176367260d223bc9483c9bd5",
+        "item_id": "303224"
+    },
+    {
+        "user_id": "5eee54d332f75df68d9c4babdb4f6b35",
+        "item_id": "1588878"
+    },
+    {
+        "user_id": "751efd615712748ea54bd36da6e521aa",
+        "item_id": "861780"
+    },
+    {
+        "user_id": "ee0d9b18a53bbd42f02853f02981d149",
+        "item_id": "16098221"
+    },
+    {
+        "user_id": "ddce5f2111227378ad6b33a6f8b6f95c",
+        "item_id": "15814471"
+    },
+    {
+        "user_id": "7a4b7bb814dc93c18f458a91142d8cb7",
+        "item_id": "8138906"
+    },
+    {
+        "user_id": "0696ae15e8a851f5aecc1eaa9bc1d995",
+        "item_id": "25112904"
+    },
+    {
+        "user_id": "56ba2e3f1005c82006ceb94f6aa112ca",
+        "item_id": "99363"
+    },
+    {
+        "user_id": "cfad07bb8e7684ae9a5840825541dee1",
+        "item_id": "457762"
+    },
+    {
+        "user_id": "b6289bd65c6f9b3090d0e9df8edd145b",
+        "item_id": "22082093"
+    },
+    {
+        "user_id": "deadf87dba510e7ccb07158d679c3d4d",
+        "item_id": "13427241"
+    },
+    {
+        "user_id": "419dfd723edeb5e27f50aa2382f9aa86",
+        "item_id": "25937860"
+    },
+    {
+        "user_id": "6cbfee0ca526f0b53e89b9d641c07d0e",
+        "item_id": "28367604"
+    },
+    {
+        "user_id": "2f8b269818e63fa958d1c8c44f6b7a3b",
+        "item_id": "29552029"
+    },
+    {
+        "user_id": "eb13a8d2e5b5fcd067f18a6e9bca48a3",
+        "item_id": "34317988"
+    },
+    {
+        "user_id": "01672d434b48017d428ebb51143cc3d2",
+        "item_id": "13414105"
+    },
+    {
+        "user_id": "b0186e605b96ff83d4feb9cb4999d03e",
+        "item_id": "1102072"
+    },
+    {
+        "user_id": "46847a20a4f448ae87f7abe9a91aaa76",
+        "item_id": "23172558"
+    },
+    {
+        "user_id": "d1e368a7d2870eb6fbf6e0d350568a2d",
+        "item_id": "19506046"
+    },
+    {
+        "user_id": "c284337d8d7fdd614c1cedf69e870c4c",
+        "item_id": "10837197"
+    },
+    {
+        "user_id": "c6f3870befd09aeba379738da27db208",
+        "item_id": "23176162"
+    },
+    {
+        "user_id": "6458ab3590a5e135601856d1c90ffbb1",
+        "item_id": "148295"
+    },
+    {
+        "user_id": "9ef785cbe200bfbb897e3e9a486634f7",
+        "item_id": "17277781"
+    },
+    {
+        "user_id": "1075811bf441c22e2cced1efff68102e",
+        "item_id": "25629441"
+    },
+    {
+        "user_id": "7d2f26248082300810da1fc4392415cd",
+        "item_id": "33622807"
+    },
+    {
+        "user_id": "97e2ce2141fa1c880967d78aec3c14fa",
+        "item_id": "23602708"
+    },
+    {
+        "user_id": "686b174e58665fe35cd89c64c0607992",
+        "item_id": "6895681"
+    },
+    {
+        "user_id": "ec204116e7ce77a2e066e2d19fadcfd6",
+        "item_id": "9306250"
+    },
+    {
+        "user_id": "42a204cc057a44d2b338aff20b4ccb1f",
+        "item_id": "26069897"
+    },
+    {
+        "user_id": "44897c5a186720969bbba808f17977a4",
+        "item_id": "6967579"
+    },
+    {
+        "user_id": "e9da2b953466eb3ed6dc5d89f53b826e",
+        "item_id": "6655"
+    },
+    {
+        "user_id": "947a2a3a84358a43e1aa0409f79eface",
+        "item_id": "2809651"
+    },
+    {
+        "user_id": "419dfd723edeb5e27f50aa2382f9aa86",
+        "item_id": "11477076"
+    },
+    {
+        "user_id": "160175d19eea47b9fa992bc50408a492",
+        "item_id": "30724086"
+    },
+    {
+        "user_id": "6e8b177e2a7bf243b09087301b7b0799",
+        "item_id": "76473"
+    },
+    {
+        "user_id": "88aeeae2b4f2e9f98922d8f0eaf35cd4",
+        "item_id": "33198191"
+    },
+    {
+        "user_id": "df634de01b921722b0c34a30a33443fe",
+        "item_id": "65975"
+    },
+    {
+        "user_id": "6ac35fe952c608da50153d64f616291b",
+        "item_id": "1253693"
+    },
+    {
+        "user_id": "f8c2ba7889b4023e22c0df9c48c4479c",
+        "item_id": "25537478"
+    },
+    {
+        "user_id": "0545857705845654d5846122f89bc5bf",
+        "item_id": "20701984"
+    },
+    {
+        "user_id": "0a728a54897242518345309e4532e045",
+        "item_id": "8011483"
+    },
+    {
+        "user_id": "0ac78236a4b1eda5f13661ce99833cdf",
+        "item_id": "13227480"
+    },
+    {
+        "user_id": "0c769e42a77799764e01a6acba0d4db1",
+        "item_id": "707742"
+    },
+    {
+        "user_id": "0ee87269f3826c61f4adcd5d4ec20e03",
+        "item_id": "23310699"
+    },
+    {
+        "user_id": "1264cb587ce1fb9a7f82f02858dabaef",
+        "item_id": "10806008"
+    },
+    {
+        "user_id": "136f5071207238e61f02f8fb94497836",
+        "item_id": "29963977"
+    },
+    {
+        "user_id": "146e086e4844da8d000a31b641ab39d9",
+        "item_id": "462838"
+    },
+    {
+        "user_id": "16007ac3f00e64f3924fff92100ffc77",
+        "item_id": "19302"
+    },
+    {
+        "user_id": "1addafb8ded3a9e56366f288175a42dd",
+        "item_id": "17137611"
+    },
+    {
+        "user_id": "1c8467b03c8ec41baf21aed180315a6c",
+        "item_id": "17934511"
+    },
+    {
+        "user_id": "2104d797fc61017863acc32930a9c286",
+        "item_id": "13501641"
+    },
+    {
+        "user_id": "2230b21a381b476c51a95bdf270ca7f1",
+        "item_id": "5805"
+    },
+    {
+        "user_id": "239e828cb401dad723106ae2ed0f0297",
+        "item_id": "25835553"
+    },
+    {
+        "user_id": "24007f22310c7642a7e273ffed9513dd",
+        "item_id": "8901945"
+    },
+    {
+        "user_id": "2676c74e4f0c4d0ea2eeb986de34e9c5",
+        "item_id": "346607"
+    },
+    {
+        "user_id": "2702f33fb1d3e896c32ab7e92cc989e1",
+        "item_id": "1353614"
+    },
+    {
+        "user_id": "2787bb87392f85ae9e642faac0620a2e",
+        "item_id": "23657454"
+    },
+    {
+        "user_id": "281051a33715d239f8a6dd7fe907893b",
+        "item_id": "22929748"
+    },
+    {
+        "user_id": "290a56d8a6dab64b23ad7bb8002534e6",
+        "item_id": "7986827"
+    },
+    {
+        "user_id": "2cad93fc8ea8def3524441a344a1d9b8",
+        "item_id": "30333750"
+    },
+    {
+        "user_id": "2f5ce191128aa2f36900ec186e09f8c0",
+        "item_id": "6372437"
+    },
+    {
+        "user_id": "34e86b9a70558750ffb6dcd3a4fbc2cd",
+        "item_id": "13105527"
+    },
+    {
+        "user_id": "3621de041d7ce6512cb6230ddccb1d10",
+        "item_id": "13323892"
+    },
+    {
+        "user_id": "3d4fe61893ac336abd2cf65e563e773f",
+        "item_id": "28789646"
+    },
+    {
+        "user_id": "3dfe9fdfa182fc14dfbbd96d8f2b1ff6",
+        "item_id": "8044557"
+    },
+    {
+        "user_id": "3e0cf7d1e90f844164a033648a766e09",
+        "item_id": "17333426"
+    },
+    {
+        "user_id": "3f6998c86ca5367b083f093810951399",
+        "item_id": "8127"
+    },
+    {
+        "user_id": "45ac83c25d4431735267568eadb33738",
+        "item_id": "1256206"
+    },
+    {
+        "user_id": "47bf700cff10060ef8b1de0c29344902",
+        "item_id": "821800"
+    },
+    {
+        "user_id": "492a0fb4e5583c5bf13e630e0b25af1e",
+        "item_id": "30971733"
+    },
+    {
+        "user_id": "495be2fa627b8807300dfc71a8badcd4",
+        "item_id": "24440804"
+    },
+    {
+        "user_id": "4cf7f99440281f9ea0ea7398a54cd227",
+        "item_id": "266904"
+    },
+    {
+        "user_id": "4fdfdc4addcb7285410078eece2d81dd",
+        "item_id": "13194973"
+    },
+    {
+        "user_id": "539b1148960f5e053a176951bbaa2a40",
+        "item_id": "17571564"
+    },
+    {
+        "user_id": "55586698ac955a29da3506ae9a5d8444",
+        "item_id": "16123825"
+    },
+    {
+        "user_id": "56756e3dec4852d3110686ed3a7e66b3",
+        "item_id": "13228357"
+    },
+    {
+        "user_id": "5782322138d34ca143bd7711068fe048",
+        "item_id": "31443393"
+    },
+    {
+        "user_id": "579f53236313b164edb2f817ab707b39",
+        "item_id": "23513349"
+    },
+    {
+        "user_id": "57b56c9366156068e4facd99dad6e685",
+        "item_id": "349170"
+    },
+    {
+        "user_id": "5cf92993760ca82a759e59158c5b2705",
+        "item_id": "5886412"
+    },
+    {
+        "user_id": "5d983c2ece9dd06e3b5bf889b1bfa046",
+        "item_id": "1420"
+    },
+    {
+        "user_id": "6263d4485413e7cf2453c97358d8e603",
+        "item_id": "25555684"
+    },
+    {
+        "user_id": "64f03b4bafe06015feef31a9fac2088b",
+        "item_id": "23498077"
+    },
+    {
+        "user_id": "64fd7787fa6b89b17b7f97da3b319a6c",
+        "item_id": "27293019"
+    },
+    {
+        "user_id": "6ad8cebb5bdc01d07c386528438a8d9d",
+        "item_id": "5"
+    },
+    {
+        "user_id": "6deadde371aa7e91f8b27387a5081cc2",
+        "item_id": "5"
+    },
+    {
+        "user_id": "724bcec82facefabfac6f979f6ba0353",
+        "item_id": "29801264"
+    },
+    {
+        "user_id": "7674cee6c9e18746fce51cac75c0d61c",
+        "item_id": "3685"
+    },
+    {
+        "user_id": "7761e30ed7de7353af787be2c2d1a478",
+        "item_id": "5"
+    },
+    {
+        "user_id": "7806c5842f47001e54e5e45eb5731da6",
+        "item_id": "18812106"
+    },
+    {
+        "user_id": "794b152b99c64d0b8c0647efbc5d61ac",
+        "item_id": "78411"
+    },
+    {
+        "user_id": "79a3acf2834e38a1ba6b123196a02d49",
+        "item_id": "15894886"
+    },
+    {
+        "user_id": "7c31cd4dfb71ad7f7249c28ab33d8829",
+        "item_id": "27424992"
+    },
+    {
+        "user_id": "84d7f66abc8c68408009aac76659bb8b",
+        "item_id": "13318597"
+    },
+    {
+        "user_id": "858c7a0008ac1c9a5ed4ebe3fa38f99e",
+        "item_id": "13197862"
+    },
+    {
+        "user_id": "865e4c5c565b9e200d62681a5ec93dbc",
+        "item_id": "28226507"
+    },
+    {
+        "user_id": "88f1cb87bde7a6418af2a9b6c04ce23c",
+        "item_id": "23302416"
+    },
+    {
+        "user_id": "89c4f3c40424f89fb8b868a8826faf6b",
+        "item_id": "3636"
+    },
+    {
+        "user_id": "96d225adb4a5584f8cc7848443516c53",
+        "item_id": "125635"
+    },
+    {
+        "user_id": "9835d617dd54296b8f5bd940f9294a3d",
+        "item_id": "6153"
+    },
+    {
+        "user_id": "99d6b57a652eb182e78ea470937c7b37",
+        "item_id": "17802632"
+    },
+    {
+        "user_id": "9ac78f51bab99198a05420582e53c02e",
+        "item_id": "9277195"
+    },
+    {
+        "user_id": "9c61e6798c8855f08a2b8bd22da3f3f8",
+        "item_id": "12125"
+    },
+    {
+        "user_id": "a599d7e31a1130f15b4a92e14e6690c8",
+        "item_id": "26877039"
+    },
+    {
+        "user_id": "a6decd198b427cc10610dd2886bfebcf",
+        "item_id": "3552023"
+    },
+    {
+        "user_id": "aa4042d85ff835ef29f9f90cc468eb2c",
+        "item_id": "8497641"
+    },
+    {
+        "user_id": "ac49ecf6a7a7c9cf67984d562b79d387",
+        "item_id": "12296449"
+    },
+    {
+        "user_id": "ad1dfba1ef87acad181864945efb1b0f",
+        "item_id": "7479376"
+    },
+    {
+        "user_id": "ade7e89511e027ed129cfa8ef4ac04b0",
+        "item_id": "17846011"
+    },
+    {
+        "user_id": "af8d466a2601dfc290dffe295c536640",
+        "item_id": "9319007"
+    },
+    {
+        "user_id": "bad00ad030826a71c1b5b8a80e9d9a72",
+        "item_id": "3918010"
+    },
+    {
+        "user_id": "bdcd1521fc554d1476f89943ebcb91f3",
+        "item_id": "2159225"
+    },
+    {
+        "user_id": "be3847abd0320ef6b98be8f7bccec6c5",
+        "item_id": "378"
+    },
+    {
+        "user_id": "bf753d5eab025ec0c958d2ce4972ba75",
+        "item_id": "18225810"
+    },
+    {
+        "user_id": "c176ae22ef153563ae145266ae34bee5",
+        "item_id": "1404405"
+    },
+    {
+        "user_id": "c832aa895bb336b7ed1848bab5d81204",
+        "item_id": "25780765"
+    },
+    {
+        "user_id": "c8b8fe7bb6bdbfed2f7e8659437c53bd",
+        "item_id": "35823032"
+    },
+    {
+        "user_id": "c9abee12afcc3f639d441bd9d868081a",
+        "item_id": "181012"
+    },
+    {
+        "user_id": "c9df1bd8e1fbeda11da721cb7be18a66",
+        "item_id": "773951"
+    },
+    {
+        "user_id": "cc3c88a93e64d36c39bc9a092779dfdd",
+        "item_id": "784261"
+    },
+    {
+        "user_id": "d008dd022aea115ff0792aedfd8e7215",
+        "item_id": "26807978"
+    },
+    {
+        "user_id": "d3af4a1c7f5fdf417a44051820a3ae7f",
+        "item_id": "2547"
+    },
+    {
+        "user_id": "d5fe3e5bd939c00eb381eb48e952c377",
+        "item_id": "11387515"
+    },
+    {
+        "user_id": "d8707144e6744aed5d4ef01640daac20",
+        "item_id": "15745292"
+    },
+    {
+        "user_id": "df92b348dec165e4cfa9aaff3680e8a4",
+        "item_id": "2470608"
+    },
+    {
+        "user_id": "e3d26e2424eb787cea6c47bfce3ddb80",
+        "item_id": "3354905"
+    },
+    {
+        "user_id": "e5e0aa61cfa1fafd882ac47ea93e6f75",
+        "item_id": "6371553"
+    },
+    {
+        "user_id": "e616e1aeb257f87d27cc729e79bf459d",
+        "item_id": "12413836"
+    },
+    {
+        "user_id": "e77cd544eb21e91b14d734c793cd7dca",
+        "item_id": "4927961"
+    },
+    {
+        "user_id": "eaa80cc55bb3bf8b89b92ed178be99c1",
+        "item_id": "31247646"
+    },
+    {
+        "user_id": "edc1cecc9b59e0329747ae7b6727b290",
+        "item_id": "2912688"
+    },
+    {
+        "user_id": "efea92c07826e7e1f0d03d1914115735",
+        "item_id": "18879551"
+    },
+    {
+        "user_id": "f6e39d50abe0d81275d0c2cea6cec2b4",
+        "item_id": "12763989"
+    },
+    {
+        "user_id": "f7f7d10f4b3569db480f02fecf286c0f",
+        "item_id": "86142"
+    },
+    {
+        "user_id": "fa4b4ad6feb476bd02918451b6bb427a",
+        "item_id": "77920"
+    },
+    {
+        "user_id": "fc41a66ef831caa48b0fcdc8b79cd1b7",
+        "item_id": "19302265"
+    },
+    {
+        "user_id": "fc449794f1ae73a92f5dc28653787e97",
+        "item_id": "13083"
+    },
+    {
+        "user_id": "fc78aa2d9cfccada2cacacefd9886e61",
+        "item_id": "157993"
+    },
+    {
+        "user_id": "fe796147c12113093da932a3ac4b40b1",
+        "item_id": "20575438"
+    }
+]

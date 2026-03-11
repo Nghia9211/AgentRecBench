@@ -33,3 +33,7 @@ baseline/run_baseline.bat
 baseline/run_baseline.bat
 *.faiss
 *.pkl
+plugin/gcn/graph_data/user_*
+plugin/gcn/graph_data/item_*
+plugin/gcn/graph_data/review_*
+

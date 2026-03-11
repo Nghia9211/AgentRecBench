@@ -17,8 +17,6 @@ Option 2:
 ```bash
 Extract dataset.zip
 ```
-
-
 #### **2. Install Dependencies**
 
 Next, navigate to the project's root directory and install all the required packages listed in the `requirements.txt` file.
@@ -26,18 +24,30 @@ Next, navigate to the project's root directory and install all the required pack
 ```bash
 pip install -r requirements.txt
 ```
+#### **3. Create DB, GCN Graph and Train GCN**
 
-3. Navigate to the Baseline Directory
+##### Build DB
 ```bash
-cd baseline
+cd plugin
+./scripts/build_vector_db.bat (run for 3 dataset)
 ```
+
+
+##### Generate Graph Data
+```bash
+cd gcn
+python graph_data/splitJson.py
+```
+#### Train 
+```bash
+./build_train_graph.bat (Run for 3 Dataset)
+```
+
 
 #### **4. Run the Baseline and View Results**
 
 Now, you can execute the baseline script. The results will be automatically saved in the `Results` folder.
 
-*(You can replace `your_baseline_script.py` with the specific script name if applicable)*
-
 ```bash
-python your_baseline_script.py
+run.bat (select your Agent to Run in run.bat)
 ```
