@@ -1,0 +1,15 @@
+output/*
+*.pyc
+./utils/__pycache__/*
+./utils/ARAGgcnRetrie/__pycache__/*
+*.pt
+run_arag_gcn.bat
+saved_models/*
+*.csv
+output1
+*.pyc
+*.pyo
+*.pyd
+data/*
+__pycache__/
+output_*
