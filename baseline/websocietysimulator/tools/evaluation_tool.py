@@ -26,6 +26,7 @@ class RecommendationMetrics:
     top_1_hit_rate: float
     top_3_hit_rate: float
     top_5_hit_rate: float
+    ndcg_at_5: float  # <--- Thêm mới
     average_hit_rate: float
     total_scenarios: int
     top_1_hits: int
@@ -63,23 +64,36 @@ class RecommendationEvaluator(BaseEvaluator):
         ground_truth: List[str],
         predictions: List[List[str]]
     ) -> RecommendationMetrics:
-        """Calculate Hit Rate at different N values"""
+        """Calculate Hit Rate and NDCG@5"""
         total = len(ground_truth)
         hits = {n: 0 for n in self.n_values}
+        total_ndcg_5 = 0.0 
         
         for gt, pred in zip(ground_truth, predictions):
+            # 1. Tính Hit Rate
             for n in self.n_values:
                 if gt in pred[:n]:
                     hits[n] += 1
+            
+            # 2. Tính NDCG@5 cho kịch bản hiện tại
+            # Công thức NDCG = 1 / log2(rank + 1) vì chỉ có 1 ground truth đúng (IDCG = 1)
+            if gt in pred[:5]:
+                rank = pred[:5].index(gt) + 1
+                total_ndcg_5 += 1.0 / np.log2(rank + 1)
         
+        # Tính toán các tỷ lệ trung bình
         top_1_hit_rate = hits[1] / total if total > 0 else 0
         top_3_hit_rate = hits[3] / total if total > 0 else 0
         top_5_hit_rate = hits[5] / total if total > 0 else 0
+        ndcg_at_5 = total_ndcg_5 / total if total > 0 else 0 # <--- Tính trung bình NDCG
+        
         average_hit_rate = (top_1_hit_rate + top_3_hit_rate + top_5_hit_rate) / 3
+        
         metrics = RecommendationMetrics(
             top_1_hit_rate=top_1_hit_rate,
             top_3_hit_rate=top_3_hit_rate,
             top_5_hit_rate=top_5_hit_rate,
+            ndcg_at_5=ndcg_at_5, # <--- Gán kết quả vào dataclass
             average_hit_rate=average_hit_rate,
             total_scenarios=total,
             top_1_hits=hits[1],
