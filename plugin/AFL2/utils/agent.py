@@ -56,113 +56,124 @@ class RecAgent:
             try:
                 if len(self.memory) == 0:
                     system_prompt = self.rec_system_prompt
-                    user_prompt = self.rec_user_prompt.format(data['seq_str'], data['len_cans'],data['cans_str'], data['prior_answer'])
+                    user_prompt = self.rec_user_prompt.format(data['seq_str'], data['len_cans'], data['cans_str'], data['prior_answer'])
                 else:
                     system_prompt = self.rec_memory_system_prompt
-                    user_prompt = self.rec_memory_user_prompt.format(data['seq_str'],data['len_cans'], data['cans_str'], '\n'.join(self.memory))
+                    user_prompt = self.rec_memory_user_prompt.format(data['seq_str'], data['len_cans'], data['cans_str'], '\n'.join(self.memory))
                 response = api_request(system_prompt, user_prompt, self.args)
                 print(f"Response : {response} ")
                 return response
             except Exception as e:
-                print(f"LỖI KHI GỌI MODEL TRONG REC_AGENT (User ID: {data.get('id', 'N/A')}): {e}") 
+                print(f"LỖI KHI GỌI MODEL TRONG REC_AGENT (User ID: {data.get('id', 'N/A')}): {e}")
                 import traceback
                 traceback.print_exc()
-                return None 
+                return None
         else:
             raise ValueError("Invalid mode: {}".format(self.mode))
-        
+
     def build_memory(self, info):
-        # Dùng item_list thay cho rec_item trong memory
-        rec_item_str = ', '.join(info['rec_item_list']) if isinstance(info.get('rec_item_list'), list) else info.get('rec_item') 
+        rec_item_str = ', '.join(info['rec_item_list']) if isinstance(info.get('rec_item_list'), list) else info.get('rec_item')
         return self.rec_build_memory.format(info['epoch'], rec_item_str, info['rec_reason'], info['user_reason'])
-    
+
     def update_memory(self, info):
         self.info_list.append(info)
         self.memory.append(self.build_memory(info))
 
     def save_memory(self, path):
         write_jsonl(path, self.info_list)
-    
+
     def load_memory(self, path):
         self.info_list = read_jsonl(path)
         self.memory = [self.build_memory(info) for info in self.info_list]
 
 
 class UserModelAgent:
-    def __init__(self, args, mode='prior_rec'):
+    def __init__(self, args, mode='prior_rec', shared_sasrec=None):
+        """
+        Args:
+            shared_sasrec: dict với các key 'model', 'id2name', 'name2id',
+                           'id2rawid', 'seq_size', 'item_num', 'device'.
+                           Nếu được truyền vào, bỏ qua load_model() và
+                           build_id2name() để tránh load SASRec lần 2.
+        """
         self.memory = []
         self.info_list = []
         self.args = args
         self.mode = mode
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.load_prompt()
-        self.load_model()
-        self.id2name = dict()
-        self.name2id = dict()
-        self.id2rawid = dict()   # dòng này TRÊN build_id2name
-        self.build_id2name()     # dòng này DƯỚI id2rawid
-        
 
+        if shared_sasrec is not None:
+            # Tái sử dụng SASRec đã load từ ARAGRecAgent
+            self.model    = shared_sasrec['model']
+            self.id2name  = shared_sasrec['id2name']
+            self.name2id  = shared_sasrec['name2id']
+            self.id2rawid = shared_sasrec['id2rawid']
+            self.seq_size = shared_sasrec['seq_size']
+            self.item_num = shared_sasrec['item_num']
+            self.device   = shared_sasrec['device']
+            print("[UserModelAgent] Reusing shared SASRec — skipping reload.")
+        else:
+            # Load bình thường khi dùng độc lập (không có ARAG)
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.id2name  = dict()
+            self.name2id  = dict()
+            self.id2rawid = dict()
+            self.build_id2name()
+            self.load_model()
 
     def build_id2name(self):
-            if any(x in self.args.data_dir for x in ['yelp', 'amazon', 'goodreads']):
-                # Load id2name (inner_id → name)
-                item_path = os.path.join(self.args.data_dir, 'id2name.txt')
-                with open(item_path, 'r', encoding='utf-8') as f:
+        if any(x in self.args.data_dir for x in ['yelp', 'amazon', 'goodreads']):
+            item_path = os.path.join(self.args.data_dir, 'id2name.txt')
+            with open(item_path, 'r', encoding='utf-8') as f:
+                for l in f.readlines():
+                    ll = l.strip('\n').split('::')
+                    self.id2name[int(ll[0])] = ll[1].strip()
+                    self.name2id[ll[1].strip()] = int(ll[0])
+
+            rawid_path = os.path.join(self.args.data_dir, 'id2rawid.txt')
+            if os.path.exists(rawid_path):
+                with open(rawid_path, 'r', encoding='utf-8') as f:
                     for l in f.readlines():
                         ll = l.strip('\n').split('::')
-                        self.id2name[int(ll[0])] = ll[1].strip()
-                        self.name2id[ll[1].strip()] = int(ll[0])
-
-                # ← THÊM: Load id2rawid (inner_id → raw_id gốc)
-                rawid_path = os.path.join(self.args.data_dir, 'id2rawid.txt')
-                if os.path.exists(rawid_path):
-                    with open(rawid_path, 'r', encoding='utf-8') as f:
-                        for l in f.readlines():
-                            ll = l.strip('\n').split('::')
-                            if len(ll) >= 2:
-                                self.id2rawid[int(ll[0])] = ll[1].strip()
-                else:
-                    print(f"[UserModelAgent] WARNING: id2rawid.txt not found at {rawid_path}. "
-                        f"Run process_data.py to generate it.")
+                        if len(ll) >= 2:
+                            self.id2rawid[int(ll[0])] = ll[1].strip()
             else:
-                raise ValueError("Invalid data dir: {}".format(self.args.data_dir))
+                print(f"[UserModelAgent] WARNING: id2rawid.txt not found at {rawid_path}. "
+                      f"Run process_data.py to generate it.")
+        else:
+            raise ValueError("Invalid data dir: {}".format(self.args.data_dir))
+
     def load_model(self):
         print(f"Loading model from {self.args.model_path}")
         data_directory = self.args.data_dir
         data_statis = pd.read_pickle(os.path.join(data_directory, 'data_statis.df'))
         self.seq_size = data_statis['seq_size'][0]
         self.item_num = data_statis['item_num'][0]
-        
+
         self.model = SASRec(64, self.item_num, self.seq_size, 0.1, self.device)
         self.model.to(self.device)
 
-        # 2. Load dữ liệu từ file .pt
         checkpoint = torch.load(self.args.model_path, map_location=self.device, weights_only=False)
 
-        # 3. Kiểm tra xem file lưu là nguyên state_dict hay là dict chứa nhiều thông tin (checkpoint)
         if isinstance(checkpoint, dict):
             if 'model_state_dict' in checkpoint:
-                # Trường hợp load từ file "best_model.pt"
                 self.model.load_state_dict(checkpoint['model_state_dict'])
             else:
-                # Trường hợp load từ file "last_model.pt" hoặc state_dict thuần
                 self.model.load_state_dict(checkpoint)
         else:
-            # Trường hợp nếu bạn lưu toàn bộ object (không khuyến khích nhưng để phòng ngừa)
             self.model = checkpoint
 
-        self.model.eval() # Quan trọng: Chuyển sang chế độ inference
+        self.model.eval()
         print("Load model weights success!")
-    
+
     def load_prompt(self):
         if self.mode == 'prior_rec':
             if 'amazon' in self.args.data_dir:
-                from constant.amazon_prior_model_prompt import user_system_prompt,user_user_prompt, user_memory_system_prompt, user_memory_user_prompt, user_build_memory, user_build_memory_2
+                from constant.amazon_prior_model_prompt import user_system_prompt, user_user_prompt, user_memory_system_prompt, user_memory_user_prompt, user_build_memory, user_build_memory_2
             elif 'goodreads' in self.args.data_dir:
-                from constant.goodreads_prior_model_prompt import user_system_prompt,user_user_prompt, user_memory_system_prompt, user_memory_user_prompt, user_build_memory, user_build_memory_2
+                from constant.goodreads_prior_model_prompt import user_system_prompt, user_user_prompt, user_memory_system_prompt, user_memory_user_prompt, user_build_memory, user_build_memory_2
             elif 'yelp' in self.args.data_dir:
-                from constant.yelp_prior_model_prompt import user_system_prompt,user_user_prompt, user_memory_system_prompt, user_memory_user_prompt, user_build_memory, user_build_memory_2
+                from constant.yelp_prior_model_prompt import user_system_prompt, user_user_prompt, user_memory_system_prompt, user_memory_user_prompt, user_build_memory, user_build_memory_2
             else:
                 raise ValueError("Invalid dataset: {}".format(self.args.data_dir))
             self.user_system_prompt = user_system_prompt
@@ -172,51 +183,62 @@ class UserModelAgent:
             self.user_build_memory = user_build_memory
             self.user_build_memory_2 = user_build_memory_2
 
-    def act(self, data, reason=None, item_list=None): # <--- ĐÃ SỬA
-            if self.mode == 'prior_rec':
-                model_output = self.model_generate(data['seq'], data['len_seq'], data['cans'])
-                
-                rec_list_str = ', '.join(item_list) if item_list else "None" 
+    def act(self, data, reason=None, item_list=None):
+        if self.mode == 'prior_rec':
+            # SASRec output — dùng làm collaborative hint trong user_prompt,
+            # KHÔNG dùng làm target trong system_prompt
+            model_output = self.model_generate(data['seq'], data['len_seq'], data['cans'])
+            rec_list_str = ', '.join(item_list) if item_list else "None"
 
-                if len(self.memory) == 0:
-                    system_prompt = self.user_system_prompt.format(data['seq_str'], data['prior_answer'])
-                    user_prompt = self.user_user_prompt.format(data['cans_str'], model_output, rec_list_str, reason) # <--- ĐÃ SỬA
-                else:
-                    # Subsequent rounds: Use memory prompts
-                    system_prompt = self.user_memory_system_prompt.format(data['seq_str'], data['prior_answer'])
-                    # SỬA DÒNG NÀY: Truyền rec_list_str thay cho item cũ
-                    user_prompt = self.user_memory_user_prompt.format(data['cans_str'], model_output, '\n'.join(self.memory), rec_list_str, reason) # <--- ĐÃ SỬA
-                
-
-                response = api_request(system_prompt, user_prompt, self.args)
-                return response
+            if len(self.memory) == 0:
+                # FIX: chỉ truyền seq_str, bỏ prior_answer khỏi system_prompt
+                system_prompt = self.user_system_prompt.format(data['seq_str'])
+                user_prompt = self.user_user_prompt.format(
+                    data['cans_str'],
+                    model_output,   # collaborative hint — "your history suggests you enjoy"
+                    rec_list_str,
+                    reason,
+                )
             else:
-                raise ValueError("Invalid mode: {}".format(self.mode))
+                # FIX: chỉ truyền seq_str, bỏ prior_answer khỏi system_prompt
+                system_prompt = self.user_memory_system_prompt.format(data['seq_str'])
+                user_prompt = self.user_memory_user_prompt.format(
+                    data['cans_str'],
+                    model_output,   # collaborative hint
+                    '\n'.join(self.memory),
+                    rec_list_str,
+                    reason,
+                )
+
+            response = api_request(system_prompt, user_prompt, self.args)
+            return response
+        else:
+            raise ValueError("Invalid mode: {}".format(self.mode))
 
     def pred_model(self, data, score):
         if len(self.memory) == 0:
             system_prompt = self.user_system_prompt.format(data['seq_str'])
             user_prompt = self.user_user_prompt.format(data['pred_item'], score)
         else:
-            system_prompt = self.user_memory_system_prompt.format(data['seq_str'], data['cans_str'],'\n'.join(self.memory))
-            user_prompt = self.user_memory_user_prompt.format(data['pred_item'],score)
-            
+            system_prompt = self.user_memory_system_prompt.format(data['seq_str'], data['cans_str'], '\n'.join(self.memory))
+            user_prompt = self.user_memory_user_prompt.format(data['pred_item'], score)
+
         response = api_request(system_prompt, user_prompt, self.args)
         return response
-    
+
     def build_memory(self, info):
         if info['user_reason'] is not None:
             return self.user_build_memory.format(info['epoch'], info['rec_item_list'], info['rec_reason'], info['user_reason'])
         else:
             return self.user_build_memory_2.format(info['epoch'], info['rec_item_list'], info['rec_reason'])
-    
+
     def update_memory(self, info):
         self.info_list.append(info)
         self.memory.append(self.build_memory(info))
 
     def save_memory(self, path):
         write_jsonl(path, self.info_list)
-    
+
     def load_memory(self, path):
         self.info_list = read_jsonl(path)
         self.memory = [self.build_memory(info) for info in self.info_list]
@@ -226,35 +248,17 @@ class UserModelAgent:
     # ------------------------------------------------------------------
 
     def update_dynamic_sequence(self, data, positive_item_names):
-        """Append pseudo-interaction items to the running sequence.
-
-        Converts *positive_item_names* to SASRec item IDs and appends them to
-        the unpadded sequence stored in *data*.  The padded representation,
-        length counter, and human-readable ``seq_str`` are updated in-place so
-        that subsequent SASRec forward passes operate on the augmented history.
-
-        Items whose names cannot be resolved to a valid model ID are silently
-        skipped.
-
-        Args:
-            data: The mutable data dict for this dialogue session.
-            positive_item_names: List of item name strings to add.
-
-        Returns:
-            The number of items actually appended.
-        """
         if not positive_item_names:
             return 0
 
         seq_unpad = list(data.get('seq_unpad', []))
-        padding_id = self.item_num  # SASRec uses item_num as padding token
+        padding_id = self.item_num
         added = 0
 
         for name in positive_item_names:
             item_id = self.name2id.get(name.strip())
             if item_id is None or item_id >= self.item_num:
                 continue
-            # Avoid duplicate consecutive items
             if seq_unpad and seq_unpad[-1] == item_id:
                 continue
             seq_unpad.append(item_id)
@@ -263,30 +267,23 @@ class UserModelAgent:
         if added == 0:
             return 0
 
-        # Truncate to the most recent seq_size items if the sequence overflows
         if len(seq_unpad) > self.seq_size:
             seq_unpad = seq_unpad[-self.seq_size:]
 
         new_len = len(seq_unpad)
-        # Re-pad: [padding, padding, ..., real_items]
         padded = [padding_id] * (self.seq_size - new_len) + seq_unpad
 
         data['seq'] = padded
         data['len_seq'] = new_len
         data['seq_unpad'] = seq_unpad
 
-        # Rebuild seq_str so that LLM prompts reflect the augmented history.
-        # Mark pseudo-interactions distinctly so the LLM can tell them apart
-        # from the original purchase history.
         if '_original_seq_str' not in data:
-            # First augmentation – stash the original values
             data['_original_seq_str'] = data.get('seq_str', 'Empty History')
-            data['_original_seq_len'] = data.get('len_seq', 0) - added  # length before this augmentation
+            data['_original_seq_len'] = data.get('len_seq', 0) - added
 
         original_str = data['_original_seq_str']
         original_len = data['_original_seq_len']
 
-        # All items beyond the original sequence are pseudo-interactions
         all_pseudo_ids = seq_unpad[original_len:] if original_len >= 0 else seq_unpad
         all_pseudo_names = [self.id2name.get(iid, f'Item_{iid}') for iid in all_pseudo_ids]
 
@@ -298,12 +295,6 @@ class UserModelAgent:
         return added
 
     def regenerate_prior(self, data):
-        """Re-compute the SASRec prior answer using the (possibly augmented) sequence.
-
-        Should be called after :meth:`update_dynamic_sequence` so that
-        ``data['prior_answer']`` stays in sync with the updated sequence for
-        subsequent dialogue rounds.
-        """
         data['prior_answer'] = self.model_generate(
             data['seq'], data['len_seq'], data['cans']
         )
@@ -312,42 +303,34 @@ class UserModelAgent:
         seq_b = [seq]
         len_seq_b = [len_seq]
         states = np.array(seq_b)
-        states = torch.LongTensor(states)
-        states = states.to(self.device)
+        states = torch.LongTensor(states).to(self.device)
         prediction = self.model.forward_eval(states, np.array(len_seq_b))
 
-        sampling_idx=[True]*self.item_num
+        sampling_idx = [True] * self.item_num
         cans_num = len(candidates)
         for i in candidates:
-            sampling_idx.__setitem__(i,False)
-        sampling_idxs = [torch.tensor(sampling_idx)]
-        sampling_idxs=torch.stack(sampling_idxs,dim=0)
-        prediction = prediction.cpu().detach().masked_fill(sampling_idxs,prediction.min().item()-1)
+            sampling_idx.__setitem__(i, False)
+        sampling_idxs = torch.stack([torch.tensor(sampling_idx)], dim=0)
+        prediction = prediction.cpu().detach().masked_fill(sampling_idxs, prediction.min().item() - 1)
         values, topK = prediction.topk(cans_num, dim=1, largest=True, sorted=True)
         topK = topK.numpy()[0]
         name_list = [self.id2name[id] for id in topK]
-        len_ret = int(len(name_list) /4 )
+        len_ret = int(len(name_list) / 4)
         return ', '.join(name_list[:len_ret])
 
     def score(self, seq, len_seq, candidates):
-        #print("seq = ", seq)
-        #print("len seq = ", len_seq)
-        #print("cans = ", candidates)
         seq_b = [seq]
         len_seq_b = [len_seq]
         states = np.array(seq_b)
-        states = torch.LongTensor(states)
-        states = states.to(self.device)
-        # pred
+        states = torch.LongTensor(states).to(self.device)
         prediction = self.model.forward_eval(states, np.array(len_seq_b))
 
-        sampling_idx=[True]*self.item_num
+        sampling_idx = [True] * self.item_num
         cans_num = len(candidates)
         for i in candidates:
-            sampling_idx.__setitem__(i,False)
-        sampling_idxs = [torch.tensor(sampling_idx)]
-        sampling_idxs=torch.stack(sampling_idxs,dim=0)
-        prediction = prediction.cpu().detach().masked_fill(sampling_idxs,prediction.min().item()-1)
+            sampling_idx.__setitem__(i, False)
+        sampling_idxs = torch.stack([torch.tensor(sampling_idx)], dim=0)
+        prediction = prediction.cpu().detach().masked_fill(sampling_idxs, prediction.min().item() - 1)
         values, topK = prediction.topk(cans_num, dim=1, largest=True, sorted=True)
         values = values.numpy()[0]
         topK = topK.numpy()[0]

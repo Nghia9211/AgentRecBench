@@ -28,16 +28,30 @@ def error_handler(e):
 def recommend(data, args):
     user_id = data.get('id')
 
-    # --- Select Rec Agent ---
     if getattr(args, 'use_arag', False):
         from utils.arag_rec_agent import ARAGRecAgent
+
         rec_agent = ARAGRecAgent(args)
         print(f"[User {user_id}] Using ARAG RecAgent")
-    else:
-        rec_agent = RecAgent(args, 'prior_rec')
-        print(f"[User {user_id}] Using vanilla RecAgent")
 
-    user_agent = UserModelAgent(args, 'prior_rec')
+        # FIX: đóng gói shared SASRec resources thành dict
+        # ARAGRecAgent đã load SASRec vào class variables → tái sử dụng
+        shared_sasrec = {
+            'model':    ARAGRecAgent._shared_sasrec_model,
+            'id2name':  ARAGRecAgent._shared_id2name,
+            'name2id':  ARAGRecAgent._shared_name2id,
+            'id2rawid': ARAGRecAgent._shared_id2rawid,
+            'seq_size': ARAGRecAgent._shared_seq_size,
+            'item_num': ARAGRecAgent._shared_item_num,
+            'device':   ARAGRecAgent._shared_device,
+        }
+        # UserModelAgent nhận shared_sasrec → bỏ qua load_model()
+        user_agent = UserModelAgent(args, shared_sasrec=shared_sasrec)
+
+    else:
+        rec_agent  = RecAgent(args, 'prior_rec')
+        user_agent = UserModelAgent(args)   # load bình thường
+        print(f"[User {user_id}] Using vanilla RecAgent")
 
     flag = False
     epoch = 1
@@ -59,7 +73,6 @@ def recommend(data, args):
             else:
                 rec_agent_response = rec_agent.act(data)
 
-                # FIX 1: Kiểm tra None TRƯỚC khi split
                 if rec_agent_response is None:
                     print(f"{prefix} RecAgent returned None, retry {attempt + 1}/{max_rec_retries}")
                     time.sleep(5)
@@ -68,7 +81,6 @@ def recommend(data, args):
                 print(f"{prefix} Rec Agent Response : {rec_agent_response}\n")
                 rec_reason, current_rec_list = split_rec_reponse_top_n(rec_agent_response)
 
-            # FIX 2: Kiểm tra cả rec_reason lẫn current_rec_list
             if rec_reason and current_rec_list:
                 rec_item_list = current_rec_list
                 break
@@ -101,12 +113,12 @@ def recommend(data, args):
             rec_res = rec_agent_response
 
         current_step_data = {
-            'id': str(user_id),
-            'epoch': epoch,
-            'rec_res': rec_res,
+            'id':       str(user_id),
+            'epoch':    epoch,
+            'rec_res':  rec_res,
             'user_res': user_agent_response,
             'rec_items': rec_item_list,
-            'flag': flag,
+            'flag':     flag,
         }
         new_data_list.append(current_step_data)
 
@@ -114,7 +126,8 @@ def recommend(data, args):
         if flag:
             gt_name = data.get('correct_answer', '').lower().strip()
             current_top_n_lower = [item.lower().strip() for item in rec_item_list]
-            print(f"{prefix} Rank list : {rec_item_list}\n{prefix} GT item : {gt_name}\n")
+            print(f"{prefix} Rank list : {rec_item_list}\n"
+                  f"{prefix} GT item   : {gt_name}\n")
 
             if gt_name in current_top_n_lower:
                 rank = current_top_n_lower.index(gt_name) + 1
@@ -125,10 +138,10 @@ def recommend(data, args):
 
         # --- Update memory ---
         memory_info = {
-            "epoch": epoch,
-            "rec_reason": rec_reason,
+            "epoch":         epoch,
+            "rec_reason":    rec_reason,
             "rec_item_list": rec_item_list,
-            "user_reason": user_reason,
+            "user_reason":   user_reason,
         }
         rec_agent.update_memory(memory_info)
         user_agent.update_memory(memory_info)

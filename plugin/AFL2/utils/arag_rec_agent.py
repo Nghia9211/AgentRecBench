@@ -1,16 +1,3 @@
-"""
-ARAGRecAgent — Drop-in replacement for RecAgent that uses the ARAG pipeline
-(User Understanding → Semantic Retrieval → NLI → Context Summary → Ranking)
-instead of a single LLM call.
-
-Exposes the same interface as RecAgent so dialogue_manager.py can swap them
-without structural changes.
-
-Context building hoàn toàn giống file 2 (baseline):
-  - Dùng InteractionTool để lấy raw reviews
-  - Dùng ReviewProcessor để tách long_term / short_term context
-"""
-
 import os
 import sys
 import json
@@ -20,19 +7,17 @@ import tiktoken
 from typing import List, Dict, Optional, Any
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-afl2_dir    = os.path.dirname(current_dir)   # plugin/AFL2
-plugin_dir  = os.path.dirname(afl2_dir)      # plugin
-root_dir    = os.path.dirname(plugin_dir)    # AgentRecBench (root)
+afl2_dir    = os.path.dirname(current_dir)
+plugin_dir  = os.path.dirname(afl2_dir)
+root_dir    = os.path.dirname(plugin_dir)
 
 sys.path.append(root_dir)
 sys.path.append(afl2_dir)
 
-# Thêm plugin/src vào sys.path để tìm thấy ARAGgcnRetrie
 _plugin_src = os.path.join(plugin_dir, 'src')
 if _plugin_src not in sys.path:
     sys.path.insert(0, _plugin_src)
 
-# Thêm baseline vào sys.path để tìm thấy websocietysimulator
 _baseline_dir = os.path.join(root_dir, 'baseline')
 if _baseline_dir not in sys.path:
     sys.path.insert(0, _baseline_dir)
@@ -51,7 +36,6 @@ from utils.rw_process import write_jsonl, read_jsonl
 
 
 def _num_tokens(text: str) -> int:
-    """Đếm token giống file 2."""
     enc = tiktoken.get_encoding("cl100k_base")
     try:
         return len(enc.encode(text))
@@ -60,7 +44,6 @@ def _num_tokens(text: str) -> int:
 
 
 def _truncate(text: str, max_tokens: int) -> str:
-    """Truncate text về max_tokens giống file 2."""
     enc = tiktoken.get_encoding("cl100k_base")
     tokens = enc.encode(text)
     if len(tokens) > max_tokens:
@@ -69,12 +52,22 @@ def _truncate(text: str, max_tokens: int) -> str:
 
 
 class ARAGRecAgent:
-    # Shared class-level resources — chỉ load 1 lần dù có nhiều instance
-    _shared_embedding    = None
-    _shared_vector_store = None
+    # ------------------------------------------------------------------ #
+    #  Shared class-level resources — load 1 lần cho toàn bộ process      #
+    # ------------------------------------------------------------------ #
+    _shared_embedding      = None
+    _shared_vector_store   = None
     _shared_gcn_embeddings = None
-    _shared_agents       = None
-    _shared_workflow     = None
+    _shared_agents         = None
+    _shared_workflow       = None
+
+    # FIX: SASRec-related resources cũng được share ở class level
+    _shared_sasrec_model   = None   # SASRec model instance
+    _shared_id2name        = None   # inner_id → item name
+    _shared_name2id        = None   # item name → inner_id
+    _shared_id2rawid       = None   # inner_id → raw_id gốc
+    _shared_seq_size       = None
+    _shared_item_num       = None
 
     def __init__(self, args, item_name_map: Dict[str, str] = None):
         self.args          = args
@@ -89,15 +82,16 @@ class ARAGRecAgent:
             openai_api_key=api_key,
         )
 
-        # Load Embedding Model (chỉ 1 lần)
+        # ── Embedding Model ──────────────────────────────────────────────
         if ARAGRecAgent._shared_embedding is None:
-            print("[ARAGRecAgent] Loading Embedding Model for the first time...")
+            print("[ARAGRecAgent] Loading Embedding Model...")
             embed_model = getattr(args, 'embed_model_name',
                                   "sentence-transformers/all-MiniLM-L6-v2")
-            ARAGRecAgent._shared_embedding = HuggingFaceEmbeddings(model_name=embed_model)
+            ARAGRecAgent._shared_embedding = HuggingFaceEmbeddings(
+                model_name=embed_model)
         self.embedding_function = ARAGRecAgent._shared_embedding
 
-        # Load FAISS (chỉ 1 lần)
+        # ── FAISS ────────────────────────────────────────────────────────
         if ARAGRecAgent._shared_vector_store is None:
             faiss_path = getattr(args, 'faiss_db_path', None)
             if faiss_path and os.path.exists(faiss_path):
@@ -106,20 +100,21 @@ class ARAGRecAgent:
                     folder_path=faiss_path,
                     embeddings=self.embedding_function,
                     allow_dangerous_deserialization=True,
-                    distance_strategy="COSINE"
+                    distance_strategy="COSINE",
                 )
         self.vector_store = ARAGRecAgent._shared_vector_store
 
-        # Load GCN Embeddings (chỉ 1 lần)
+        # ── GCN Embeddings ───────────────────────────────────────────────
         if ARAGRecAgent._shared_gcn_embeddings is None:
             import torch
             gcn_path = getattr(args, 'gcn_path', None)
             if gcn_path and os.path.exists(gcn_path):
                 print(f"[ARAGRecAgent] Loading GCN Embeddings from {gcn_path}...")
-                ARAGRecAgent._shared_gcn_embeddings = torch.load(gcn_path, map_location='cpu')
+                ARAGRecAgent._shared_gcn_embeddings = torch.load(
+                    gcn_path, map_location='cpu')
         self.gcn_embeddings = ARAGRecAgent._shared_gcn_embeddings
 
-        # Load ARAG Agents & Workflow (chỉ 1 lần)
+        # ── ARAG Agents & Workflow ────────────────────────────────────────
         if ARAGRecAgent._shared_agents is None:
             print("[ARAGRecAgent] Initializing ARAG Agents & Workflow...")
             agents = ARAGAgents(
@@ -132,11 +127,106 @@ class ARAGRecAgent:
             builder = GraphBuilder(agent_provider=agents)
             ARAGRecAgent._shared_agents   = agents
             ARAGRecAgent._shared_workflow = builder.build()
-
         self.agents   = ARAGRecAgent._shared_agents
         self.workflow = ARAGRecAgent._shared_workflow
 
+        # ── SASRec (FIX: load 1 lần, share qua class variable) ──────────
+        if ARAGRecAgent._shared_sasrec_model is None:
+            self._load_sasrec(args)
+        # Expose các attribute để các method khác dùng giống UserModelAgent
+        self.sasrec_model = ARAGRecAgent._shared_sasrec_model
+        self.id2name      = ARAGRecAgent._shared_id2name
+        self.name2id      = ARAGRecAgent._shared_name2id
+        self.id2rawid     = ARAGRecAgent._shared_id2rawid
+        self.seq_size     = ARAGRecAgent._shared_seq_size
+        self.item_num     = ARAGRecAgent._shared_item_num
+
         self._load_build_memory_template()
+
+    # ------------------------------------------------------------------ #
+    #  SASRec loader — chỉ chạy 1 lần nhờ class-level guard              #
+    # ------------------------------------------------------------------ #
+    @classmethod
+    def _load_sasrec(cls, args):
+        import torch
+        import pandas as pd
+        from utils.model import SASRec
+
+        print("[ARAGRecAgent] Loading SASRec model (first time only)...")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        data_statis = pd.read_pickle(
+            os.path.join(args.data_dir, 'data_statis.df'))
+        seq_size = data_statis['seq_size'][0]
+        item_num = data_statis['item_num'][0]
+
+        sasrec = SASRec(64, item_num, seq_size, 0.1, device)
+        sasrec.to(device)
+
+        checkpoint = torch.load(args.model_path, map_location=device,
+                                weights_only=False)
+        if isinstance(checkpoint, dict):
+            state = checkpoint.get('model_state_dict', checkpoint)
+        else:
+            state = checkpoint
+        sasrec.load_state_dict(state)
+        sasrec.eval()
+        print("[ARAGRecAgent] SASRec loaded successfully.")
+
+        # id2name / name2id / id2rawid
+        id2name, name2id, id2rawid = {}, {}, {}
+        item_path = os.path.join(args.data_dir, 'id2name.txt')
+        with open(item_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                ll = line.strip('\n').split('::')
+                id2name[int(ll[0])]    = ll[1].strip()
+                name2id[ll[1].strip()] = int(ll[0])
+
+        rawid_path = os.path.join(args.data_dir, 'id2rawid.txt')
+        if os.path.exists(rawid_path):
+            with open(rawid_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    ll = line.strip('\n').split('::')
+                    if len(ll) >= 2:
+                        id2rawid[int(ll[0])] = ll[1].strip()
+        else:
+            print("[ARAGRecAgent] WARNING: id2rawid.txt not found.")
+
+        # Ghi vào class variables
+        cls._shared_sasrec_model = sasrec
+        cls._shared_id2name      = id2name
+        cls._shared_name2id      = name2id
+        cls._shared_id2rawid     = id2rawid
+        cls._shared_seq_size     = seq_size
+        cls._shared_item_num     = item_num
+        cls._shared_device       = device
+
+    # ------------------------------------------------------------------ #
+    #  SASRec inference — dùng shared model, không tạo instance mới       #
+    # ------------------------------------------------------------------ #
+    def model_generate(self, seq, len_seq, candidates) -> str:
+        """Collaborative hint cho RecAgent — giống UserModelAgent.model_generate."""
+        import torch
+        import numpy as np
+
+        device = ARAGRecAgent._shared_device
+        states = torch.LongTensor([seq]).to(device)
+        prediction = self.sasrec_model.forward_eval(
+            states, np.array([len_seq]))
+
+        sampling_idx = [True] * self.item_num
+        for i in candidates:
+            sampling_idx[i] = False
+        sampling_idxs = torch.stack(
+            [torch.tensor(sampling_idx)], dim=0)
+        prediction = (prediction.cpu().detach()
+                      .masked_fill(sampling_idxs,
+                                   prediction.min().item() - 1))
+        _, topK = prediction.topk(len(candidates), dim=1,
+                                  largest=True, sorted=True)
+        name_list = [self.id2name[i] for i in topK.numpy()[0]]
+        len_ret = max(1, int(len(name_list) / 4))
+        return ', '.join(name_list[:len_ret])
 
     def _load_build_memory_template(self):
         if 'amazon' in self.args.data_dir:
@@ -166,10 +256,12 @@ class ARAGRecAgent:
                 raw_item = None
                 if tool and raw_id:
                     raw_item = tool.get_item(item_id=str(raw_id))
-
-                    keys_to_extract = ["item_id","title", "description", "authors", "series", "popular_shelves_topk", "average_rating", "ratings_count", "text_reviews_count", "similar_books"]
-                    filtered_item = {key: raw_item[key] for key in keys_to_extract if key in raw_item}
-                    item_list.append(filtered_item)
+                    if 'goodreads' in self.args.data_dir:
+                        keys_to_extract = ["item_id","title", "description", "authors", "series", "popular_shelves_topk", "average_rating", "ratings_count", "text_reviews_count", "similar_books"]
+                        filtered_item = {key: raw_item[key] for key in keys_to_extract if key in raw_item}
+                        item_list.append(filtered_item)
+                    else :
+                        item_list.append(raw_item)
                 # if raw_item and isinstance(raw_item, dict):
                 #     # normalize_item tự dò alias cho item_id và name
                 #     norm = normalize_item(raw_item)

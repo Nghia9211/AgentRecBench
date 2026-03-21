@@ -110,24 +110,20 @@ def main(args):
         print("  MODE: Vanilla AFL (no ARAG)")
         print("=" * 60)
 
-    # 1. Load basic data
     dataset  = GeneralDataset(args, stage=args.stage)
     data_map = {str(d['id']): d for d in dataset}
 
     with open(args.input_json_file, 'r', encoding='utf-8') as f:
         new_input_list = json.load(f)
 
-    # 2. Load Mappings
     print(args.candidate_dir)
     candidate_map = load_candidate_map(args.candidate_dir)
     item_name_map = load_item_name_map(args.item_mapping_file)
 
-    # 3. Init SASRec Agent for Prior
     temp_args = argparse.Namespace(**vars(args))
     temp_args.model = 'sasrec_inference'
     sasrec_tool = UserModelAgent(temp_args, mode='prior_rec')
 
-    # 4. Prepare Data
     merge_data_list, skipped = prepare_merge_data(
         new_input_list, data_map, candidate_map, item_name_map, sasrec_tool, args
     )
@@ -135,9 +131,8 @@ def main(args):
     if args.max_samples > 0:
         merge_data_list = merge_data_list[:args.max_samples]
 
-    # 5. Khởi tạo InteractionTool + load id2rawid (chỉ khi dùng ARAG)
     if args.use_arag:
-        # Tự động resolve absolute path nếu raw_data_dir chưa được set
+    
         if not args.raw_data_dir:
             args.raw_data_dir = os.path.join(root_dir, 'dataset', 'output_data_all')
         args.raw_data_dir = os.path.abspath(args.raw_data_dir)
@@ -196,7 +191,6 @@ def main(args):
         pool.close()
         pool.join()
 
-    # 7. Save Metrics
     save_final_metrics(args, total, correct_hit1, correct_hit3, correct_hit5)
 
 
