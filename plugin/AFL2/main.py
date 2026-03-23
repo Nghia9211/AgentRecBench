@@ -8,6 +8,7 @@ import random
 from torch.utils.data import Dataset, DataLoader
 import multiprocessing
 import sys
+import math
 
 current_dir  = os.path.dirname(os.path.abspath(__file__))  # plugin/AFL2
 parent_dir   = os.path.dirname(current_dir)                 # plugin
@@ -36,6 +37,7 @@ total = 0
 correct_hit1 = 0
 correct_hit3 = 0
 correct_hit5 = 0
+total_ndcg5 = 0.0
 
 
 def get_args():
@@ -81,7 +83,7 @@ def get_args():
 
 
 def setcallback(x):
-    global finish_num, total, correct_hit1, correct_hit3, correct_hit5
+    global finish_num, total, correct_hit1, correct_hit3, correct_hit5,total_ndcg5
     data_list, hit_at_n, args = x
     for step in data_list:
         append_jsonl(args.output_file, step)
@@ -89,11 +91,16 @@ def setcallback(x):
     if hit_at_n[1]: correct_hit1 += 1
     if hit_at_n[3]: correct_hit3 += 1
     if hit_at_n[5]: correct_hit5 += 1
+
+    rank = hit_at_n.get('rank')
+    if rank is not None and rank <= 5:
+        total_ndcg5 += 1.0 / math.log2(rank + 1)
     agent_tag = "ARAG" if getattr(args, 'use_arag', False) else "AFL"
     print(f"[{agent_tag}][{finish_num}/{total}] "
           f"Hit@1: {correct_hit1/finish_num*100:.2f}% | "
           f"Hit@3: {correct_hit3/finish_num*100:.2f}% | "
-          f"Hit@5: {correct_hit5/finish_num*100:.2f}%")
+          f"Hit@5: {correct_hit5/finish_num*100:.2f}% | "
+          f"NDCG@5: {total_ndcg5/finish_num:.4f}")
 
 
 def main(args):
@@ -191,7 +198,7 @@ def main(args):
         pool.close()
         pool.join()
 
-    save_final_metrics(args, total, correct_hit1, correct_hit3, correct_hit5)
+    save_final_metrics(args, total, correct_hit1, correct_hit3, correct_hit5, total_ndcg5)
 
 
 if __name__ == '__main__':

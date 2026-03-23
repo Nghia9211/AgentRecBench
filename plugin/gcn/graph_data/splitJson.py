@@ -47,6 +47,6 @@ def split_json_by_source(input_file, prefix_type):
     print(f"\n✅ Successfully {input_file}! Total {count} splited line.")
     print("-" * 30)
 
-split_json_by_source('../../dataset/output_data_all/review.json', 'review')
-split_json_by_source('../../dataset/output_data_all/item.json', 'item')
-split_json_by_source('../../dataset/output_data_all/user.json', 'user')
+split_json_by_source('../../../dataset/output_data_all/review.json', 'review')
+split_json_by_source('../../../dataset/output_data_all/item.json', 'item')
+split_json_by_source('../../../dataset/output_data_all/user.json', 'user')

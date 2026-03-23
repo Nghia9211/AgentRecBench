@@ -57,7 +57,7 @@ def recommend(data, args):
     epoch = 1
     rec_item_list = []
     new_data_list = []
-    hit_at_n = {1: False, 3: False, 5: False}
+    hit_at_n = {1: False, 3: False, 5: False, 'rank': None  }
 
     while flag is False and epoch <= args.max_epoch:
         prefix = f"[User {user_id}][Round {epoch}]"
@@ -131,6 +131,7 @@ def recommend(data, args):
 
             if gt_name in current_top_n_lower:
                 rank = current_top_n_lower.index(gt_name) + 1
+                hit_at_n['rank'] = rank
                 if rank <= 1: hit_at_n[1] = True
                 if rank <= 3: hit_at_n[3] = True
                 if rank <= 5: hit_at_n[5] = True

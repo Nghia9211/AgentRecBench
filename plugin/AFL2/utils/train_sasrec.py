@@ -126,19 +126,13 @@ def main():
                 'val_loss': avg_val_loss,
                 'item_num': item_num
             }, save_path)
-            # print(f" --> Saved Best Model at Epoch {epoch+1}")
 
-    # 4. Lưu Model cuối cùng (Last Epoch)
     final_model_name = os.path.basename(args.data_dir) + "_last_model.pt"
     torch.save(model.state_dict(), os.path.join(args.output_dir, final_model_name))
     print(f"✅ Training hoàn tất. Best Val Loss: {best_val_loss:.4f}")
-
-    # 5. Vẽ biểu đồ (Cần cập nhật hàm plot_training_results để nhận thêm val_loss)
     plot_name = os.path.basename(args.data_dir) + "_training_plot.png"
     plot_path = os.path.join(args.output_dir, plot_name)
     
-    # Giả sử hàm plot_training_results của bạn có thể nhận thêm tập valid_loss
-    # Nếu không, bạn hãy sửa hàm đó để vẽ 2 đường Train/Valid Loss
     plot_training_results(train_loss_history, l2_history, plot_path, val_loss_history=val_loss_history)
 
 if __name__ == '__main__':
