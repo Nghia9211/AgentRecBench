@@ -36,4 +36,5 @@ baseline/run_baseline.bat
 plugin/gcn/graph_data/user_*
 plugin/gcn/graph_data/item_*
 plugin/gcn/graph_data/review_*
+output_tasks_*
 
