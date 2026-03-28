@@ -282,8 +282,8 @@ class ARAGRecAgent:
                 #         'name':    fallback_name,
                 #     }))
 
-            print(f"[ARAGRecAgent] Candidate list (len={len(item_list)}): "
-                f"{item_list}\n")
+            # print(f"[ARAGRecAgent] Candidate list (len={len(item_list)}): "
+                # f"{item_list}\n")
             return item_list
 
     def _get_filtered_reviews(self, data: dict) -> list:
@@ -331,7 +331,7 @@ class ARAGRecAgent:
             base_ctx_str += "\n\n--- Previous Recommendation Attempts (REJECTED) ---\n"
             base_ctx_str += "\n".join(self.memory)
         
-        print(f"Long term context : {base_ctx_str} \n\n ")
+        # print(f"Long term context : {base_ctx_str} \n\n ")
 
         return base_ctx_str
 
@@ -366,7 +366,7 @@ class ARAGRecAgent:
         # if prior:
         #     session_ctx = prior + " Sequential model also suggests: {prior}."
         
-        print(f"Current Session {session_ctx} \n\n")
+        # print(f"Current Session {session_ctx} \n\n")
 
         return session_ctx
 

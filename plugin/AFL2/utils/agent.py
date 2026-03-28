@@ -126,7 +126,7 @@ class UserModelAgent:
             item_path = os.path.join(self.args.data_dir, 'id2name.txt')
             with open(item_path, 'r', encoding='utf-8') as f:
                 for l in f.readlines():
-                    ll = l.strip('\n').split('::')
+                    ll = l.strip('\n').split('::', 1)
                     self.id2name[int(ll[0])] = ll[1].strip()
                     self.name2id[ll[1].strip()] = int(ll[0])
 
