@@ -2,7 +2,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Any, Callable
 import torch
 import json
-
+import re
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CORE IDEA: Don't decide what fields matter — preserve everything meaningful
@@ -173,3 +173,21 @@ def truncate_string_tokens(text: str, max_chars: int = 30000):
     if len(text) <= max_chars:
         return text
     return "..." + text[-max_chars:]
+
+def sanitize_prompt(prompt):
+    """
+    Clean prompt content trước khi gửi lên OpenAI API.
+    Loại bỏ các ký tự có thể phá vỡ JSON serialization.
+    """
+    if prompt is None:
+        return ""
+    
+    text = str(prompt)
+    
+    text = text.replace('\x00', '')
+    
+    text = re.sub(r'[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+    
+    text = text.encode('utf-8', errors='ignore').decode('utf-8')
+    
+    return text
