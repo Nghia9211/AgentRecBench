@@ -69,11 +69,11 @@ class MyRecommendationAgent(RecommendationAgent):
         for r in all_reviews:
             if r.get('item_id') not in candidate_ids:
                 history_reviews_list.append({k: r.get(k) for k in review_keys if k in r})
-
+        print(f" Số item : {len(history_reviews_list)} \n\n")
         history_str = str(history_reviews_list)
-        if num_tokens_from_string(history_str) > 8000:
+        if num_tokens_from_string(history_str) > 16000:
             enc = tiktoken.get_encoding("cl100k_base")
-            history_str = enc.decode(enc.encode(history_str)[:8000])
+            history_str = enc.decode(enc.encode(history_str)[:16000])
 
         item_details = []
         for item_id in self.task['candidate_list']:
@@ -100,6 +100,7 @@ The correct output format: [Sorted Candidate Item List]
         """.strip()
 
         result = self.reasoning(task_description)
+        print(result)
 
         try:
             matches = re.findall(r"\[(.*?)\]", result, re.DOTALL)
@@ -110,6 +111,8 @@ The correct output format: [Sorted Candidate Item List]
                 final_list.extend(remaining)
                 print(f"Successfully ranked {len(final_list)} items for {current_set}")
                 return final_list[:20]
+            else :
+                print("NOt match")
             return self.task['candidate_list']
         except Exception as e:
             print(f"Error parsing: {e}")
@@ -132,15 +135,15 @@ if __name__ == "__main__":
 
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True)
     simulator.set_task_and_groundtruth(
-        task_dir=f"../dataset/task/{scenario}/{task_set}/tasks",
-        groundtruth_dir=f"../dataset/task/{scenario}/{task_set}/groundtruth",
+        task_dir=f"../dataset/tasks2/{scenario}/{task_set}/tasks",
+        groundtruth_dir=f"../dataset/tasks2/{scenario}/{task_set}/groundtruth",
     )
     simulator.set_agent(MyRecommendationAgent)
 
     # ← Dùng llm đã build ở trên
     simulator.set_llm(llm)
 
-    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers=10)
+    agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers=10)
 
     evaluation_results = simulator.evaluate()
     os.makedirs(f'./results/{scenario}', exist_ok=True)

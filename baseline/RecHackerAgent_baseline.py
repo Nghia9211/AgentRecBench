@@ -71,9 +71,9 @@ class MyRecommendationAgent(RecommendationAgent):
                 candidate_ids  = set(self.task['candidate_list'])
                 filtered       = [r for r in all_reviews if r.get('item_id') not in candidate_ids]
                 history_review = str(filtered)
-                if num_tokens_from_string(history_review) > 8000:
+                if num_tokens_from_string(history_review) > 16000:
                     enc = tiktoken.get_encoding("cl100k_base")
-                    history_review = enc.decode(enc.encode(history_review)[:8000])
+                    history_review = enc.decode(enc.encode(history_review)[:16000])
 
         task_description = f"""
 You are a real human user on {task_type}, a platform for crowd-sourced {task_item} reviews.
@@ -122,13 +122,13 @@ if __name__ == "__main__":
 
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True)
     simulator.set_task_and_groundtruth(
-        task_dir=f"../dataset/task/{scenario}/{task_set}/tasks",
-        groundtruth_dir=f"../dataset/task/{scenario}/{task_set}/groundtruth",
+        task_dir=f"../dataset/tasks2/{scenario}/{task_set}/tasks",
+        groundtruth_dir=f"../dataset/tasks2/{scenario}/{task_set}/groundtruth",
     )
     simulator.set_agent(MyRecommendationAgent)
     simulator.set_llm(llm)
 
-    agent_outputs      = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers=10)
+    agent_outputs      = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers=10)
     evaluation_results = simulator.evaluate()
 
     os.makedirs(f'./results/{scenario}', exist_ok=True)

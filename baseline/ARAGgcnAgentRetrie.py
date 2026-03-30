@@ -98,9 +98,9 @@ class MyRecommendationAgent(RecommendationAgent):
                 history_review = str(filtered_reviews)
                 
                 input_tokens = num_tokens_from_string(history_review)
-                if input_tokens > 8000:
+                if input_tokens > 16000:
                     encoding = tiktoken.get_encoding("cl100k_base")
-                    history_review = encoding.decode(encoding.encode(history_review)[:8000])
+                    history_review = encoding.decode(encoding.encode(history_review)[:16000])
             else:
                 pass
         
@@ -165,7 +165,7 @@ if __name__ == "__main__":
 
 
     " Load scenarios"
-    simulator.set_task_and_groundtruth(task_dir=f"../dataset/task/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/task/{scenario}/{task_set}/groundtruth")
+    simulator.set_task_and_groundtruth(task_dir=f"../dataset/tasks2/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/tasks2/{scenario}/{task_set}/groundtruth")
 
     " Set Agent"
     simulator.set_agent(MyRecommendationAgent)
@@ -174,7 +174,7 @@ if __name__ == "__main__":
     load_dotenv()
     " -- OPEN AI -- "
     openai_api_key = os.getenv("OPEN_API_KEY")
-    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.1)
+    model = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
 
 
     arag_recommender = ARAGgcnRetrieRecommender(
@@ -193,10 +193,10 @@ if __name__ == "__main__":
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
 
     " Option 1: No Threading "
-    # agent_outputs = simulator.run_simulation(number_of_tasks=2, enable_threading=False)
+    agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    agent_outputs = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers = 10)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers =5)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()

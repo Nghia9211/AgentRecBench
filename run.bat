@@ -36,6 +36,23 @@ echo.
 set /p sc_choices="Select scenario (Ex: 1 2 3): "
 
 echo.
+echo =====================================================
+echo 3. CHON LLM PROVIDER
+echo =====================================================
+echo [1] ollama
+echo [2] gpt
+echo [3] groq
+echo.
+set /p prov_choice="Select Provider (1, 2, or 3): "
+set "PROV="
+if "%prov_choice%"=="1" set "PROV=ollama"
+if "%prov_choice%"=="2" set "PROV=gpt"
+if "%prov_choice%"=="3" set "PROV=groq"
+
+echo.
+set /p MODEL_NAME="Enter Model Name (Leave blank to use default): "
+
+echo.
 set /p num_runs="Enter number of experiments to run : (Ex: 5): "
 
 pushd baseline
@@ -55,26 +72,24 @@ for %%d in (%ds_choices%) do (
 
             if defined SC (
                 echo.
-                echo [STARTING] Dataset: !DS! ^| Scenario: !SC!
+                echo [STARTING] Dataset: !DS! ^| Scenario: !SC! ^| Provider: !PROV!
                 
                 for /L %%r in (1,1,%num_runs%) do (
                     echo.
                     echo [RUN %%r/%num_runs%] Dataset: !DS! ^| Scenario: !SC!
 
-                    @REM python CoTAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python CoTMemoryAgent_baseline.py --task_set !DS! --scenario !SC!
-                    @REM python MemoryAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python DummyAgent_baseline.py --task_set !DS! --scenario !SC! 
-                    @REM python RecHackerAgent_baseline.py --task_set !DS! --scenario !SC!  
-                    @REM python Baseline666_baseline.py --task_set !DS! --scenario !SC! 
+                    @REM Thiết lập tham số model nếu có nhập
+                    set "MODEL_ARG="
+                    if not "!MODEL_NAME!"=="" set "MODEL_ARG=--model !MODEL_NAME!"
+
+                    @REM python CoTAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
+                    @REM python CoTMemoryAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
+                    @REM python MemoryAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
+                    @REM python DummyAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
+                    @REM python RecHackerAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
+                    @REM python Baseline666_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
                     
                     @REM Currently Run On Server for Test Result
-                    @REM python ARAGAgent.py --task_set !DS! --scenario !SC! 
-                    
-                    @REM python ARAGgcnAgent.py --task_set !DS! --scenario !SC!
-                    
-                    @REM python ARAGAgent_init.py --task_set !DS! --scenario !SC! 
-                    
                     python ARAGgcnAgentRetrie.py --task_set !DS! --scenario !SC! 
 
                     set "TARGET_DIR=./results/!SC!"

@@ -2,6 +2,38 @@ import os
 import json
 from tqdm import tqdm
 
+
+def build_candidate_order(candidate_dir):
+    """
+    Tạo mapping: user_id → thứ tự (index) theo số thứ tự file trong candidate_dir.
+    task_0.json → 0, task_1.json → 1, ..., task_99.json → 99
+    
+    Dùng để sort merge_data_list cho khớp thứ tự candidate dir.
+    """
+    order_map = {}
+    if not candidate_dir or not os.path.exists(candidate_dir):
+        return order_map
+
+    candidate_files = [f for f in os.listdir(candidate_dir)
+                       if f.startswith('task_') and f.endswith('.json')]
+    # Sort theo số trong tên file: task_0, task_1, ..., task_100
+    candidate_files.sort(key=lambda f: int(f.replace('task_', '').replace('.json', '')))
+
+    for idx, file_name in enumerate(candidate_files):
+        try:
+            with open(os.path.join(candidate_dir, file_name), 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                entry = data[0] if isinstance(data, list) else data
+                uid = str(entry.get('user_id'))
+                order_map[uid] = idx
+        except:
+            continue
+
+    print(f"[CandidateOrder] Built order map for {len(order_map)} users "
+          f"(task_0 → task_{len(order_map)-1})")
+    return order_map
+
+
 def load_candidate_map(candidate_dir):
     candidate_map = {}
     if not candidate_dir or not os.path.exists(candidate_dir):

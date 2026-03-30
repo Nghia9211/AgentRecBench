@@ -23,7 +23,7 @@ if baseline_dir not in sys.path:
     sys.path.insert(0, baseline_dir)
 
 from utils.dialogue_manager import recommend, error_handler
-from utils.data_processor import load_candidate_map, load_item_name_map, prepare_merge_data
+from utils.data_processor import load_candidate_map, load_item_name_map, prepare_merge_data, build_candidate_order
 from AFL2.utils.save_result import save_final_metrics
 from utils.rw_process import append_jsonl
 from dataset.general_dataset import GeneralDataset
@@ -31,14 +31,15 @@ from utils.agent import UserModelAgent, RecAgent
 
 # --- Import InteractionTool ---
 from websocietysimulator.tools import CacheInteractionTool
-
+from utils.hybrid_ranking import tune_alpha 
 finish_num = 0
 total = 0
 correct_hit1 = 0
 correct_hit3 = 0
 correct_hit5 = 0
 total_ndcg5 = 0.0
-
+all_hybrid_logs = []
+finish_num = 0
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -73,6 +74,8 @@ def get_args():
     parser.add_argument('--nli_threshold', type=float, default=5.5)
     parser.add_argument('--embed_model_name', type=str,
                         default='sentence-transformers/all-MiniLM-L6-v2')
+    parser.add_argument('--use_hybrid', action='store_true',
+                    help="Dùng hybrid SASRec+ARAG ranking")
 
     # --- Thêm arg cho raw data dir ---
     parser.add_argument('--raw_data_dir', type=str,
@@ -83,8 +86,10 @@ def get_args():
 
 
 def setcallback(x):
-    global finish_num, total, correct_hit1, correct_hit3, correct_hit5,total_ndcg5
-    data_list, hit_at_n, args = x
+    global finish_num, total, correct_hit1, correct_hit3, correct_hit5,total_ndcg5,all_hybrid_logs
+    data_list, hit_at_n, args, hybrid_log = x 
+    if hybrid_log:  
+        all_hybrid_logs.extend(hybrid_log)
     for step in data_list:
         append_jsonl(args.output_file, step)
     finish_num += 1
@@ -135,8 +140,18 @@ def main(args):
         new_input_list, data_map, candidate_map, item_name_map, sasrec_tool, args
     )
 
+    # --- Sort merge_data_list theo đúng thứ tự task_0 → task_N trong candidate dir ---
+    candidate_order = build_candidate_order(args.candidate_dir)
+    if candidate_order:
+        merge_data_list.sort(
+            key=lambda d: candidate_order.get(str(d['id']), float('inf'))
+        )
+        print(f"[Main] Sorted merge_data_list by candidate file order "
+              f"({len(candidate_order)} entries)")
+
     if args.max_samples > 0:
         merge_data_list = merge_data_list[:args.max_samples]
+        # merge_data_list = merge_data_list[220:320]
 
     if args.use_arag:
     
@@ -199,7 +214,19 @@ def main(args):
         pool.join()
 
     save_final_metrics(args, total, correct_hit1, correct_hit3, correct_hit5, total_ndcg5)
-
+    # Bước 3: Nếu có sử dụng Hybrid, tiến hành phân tích Alpha tối ưu
+    if getattr(args, 'use_hybrid', False) and all_hybrid_logs:
+        print("\n" + "="*30)
+        print("HYBRID RANKING ANALYSIS")
+        print("="*30)
+        # Hàm này sẽ thử nghiệm các mức alpha khác nhau trên dữ liệu thực tế vừa chạy
+        tuning_results = tune_alpha(all_hybrid_logs)
+        
+        # Lưu kết quả tuning vào file nếu cần
+        tuning_file = args.output_file.replace('.jsonl', '_hybrid_tuning.json')
+        with open(tuning_file, 'w') as f:
+            json.dump(tuning_results, f, indent=4)
+        print(f"Detailed hybrid analysis saved to: {tuning_file}")
 
 if __name__ == '__main__':
     args = get_args()

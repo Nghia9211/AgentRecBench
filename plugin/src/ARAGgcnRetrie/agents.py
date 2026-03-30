@@ -11,7 +11,7 @@ from .prompts import *
 from .schemas import BlackboardMessage, ItemRankerContent, NLIContent, RankedItem, RecState
 from .utils import (
     find_top_k_similar_items, normalize_item,
-    get_gcn_latent_interests, get_user_understanding, get_user_summary,
+    get_gcn_latent_interests, get_user_understanding, get_user_summary,sanitize_prompt
 )
 from .metric import evaluate_hit_rate
 
@@ -24,7 +24,7 @@ class ARAGAgents:
         self.embedding_function = embedding_function
         self.gcn_embeddings   = None
         self.encoding = tiktoken.get_encoding("cl100k_base")
-        self.max_context_tokens = 8000  # Keep under 16k context limit for safety
+        self.max_context_tokens = 16000  
 
         if gcn_path:
             try:
@@ -164,6 +164,12 @@ class ARAGAgents:
             user_summary=get_user_understanding(state),
             items_with_scores_str=scored_str,
         )
+        if hasattr(prompt, 'messages'):
+            for msg in prompt.messages:
+                msg.content = sanitize_prompt(msg.content)
+        else:
+            prompt = sanitize_prompt(prompt)
+
         output = self.model.invoke(prompt).content
         return {'blackboard': [BlackboardMessage(role="ContextSummary", content=output)]}
 
