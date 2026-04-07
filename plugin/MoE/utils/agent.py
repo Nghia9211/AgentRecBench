@@ -185,17 +185,14 @@ class UserModelAgent:
 
     def act(self, data, reason=None, item_list=None):
         if self.mode == 'prior_rec':
-            # SASRec output — dùng làm collaborative hint trong user_prompt,
-            # KHÔNG dùng làm target trong system_prompt
-            model_output = self.model_generate(data['seq'], data['len_seq'], data['cans'])
             rec_list_str = ', '.join(item_list) if item_list else "None"
 
             if len(self.memory) == 0:
-                # FIX: chỉ truyền seq_str, bỏ prior_answer khỏi system_prompt
+                
                 system_prompt = self.user_system_prompt.format(data['seq_str'])
                 user_prompt = self.user_user_prompt.format(
                     data['cans_str'],
-                    model_output,   # collaborative hint — "your history suggests you enjoy"
+                     data['seq_str'],   
                     rec_list_str,
                     reason,
                 )
@@ -204,7 +201,7 @@ class UserModelAgent:
                 system_prompt = self.user_memory_system_prompt.format(data['seq_str'])
                 user_prompt = self.user_memory_user_prompt.format(
                     data['cans_str'],
-                    model_output,   # collaborative hint
+                    data['seq_str'],   
                     '\n'.join(self.memory),
                     rec_list_str,
                     reason,

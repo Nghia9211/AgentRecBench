@@ -2,40 +2,21 @@ import requests
 import time
 import json
 
-# LangSmith tracing — optional, degrades gracefully if not installed
-try:
-    from langsmith import traceable
-    HAS_LANGSMITH = True
-except ImportError:
-    HAS_LANGSMITH = False
-    def traceable(*args, **kwargs):
-        """No-op decorator fallback."""
-        def decorator(fn):
-            return fn
-        if len(args) == 1 and callable(args[0]):
-            return args[0]
-        return decorator
-
-
 def api_request(system_prompt, user_prompt, args, few_shot=None):
-    if "gpt" in args.model:
-        return gpt_api(system_prompt, user_prompt, args, few_shot)
-    else:
-        raise ValueError(f"Unsupported model: {args.model}")
+    return gpt_api(system_prompt, user_prompt, args, few_shot)
 
-
-@traceable(
-    run_type="llm",
-    name="AFL-GPT-Call",
-    metadata={"source": "afl_vanilla"}
-)
 def gpt_api(system_prompt, user_prompt, args, few_shot=None):
     retry_count = 0
     max_retry_num = args.max_retry_num
 
-    url = "https://api.openai.com/v1/chat/completions"
+    # url = "https://api.openai.com/v1/chat/completions"
+    if hasattr(args, 'base_url') and args.base_url:
+        # Đảm bảo url kết thúc bằng /chat/completions
+        url = f"{args.base_url.rstrip('/')}/chat/completions"
+    else:
+        url = "https://api.openai.com/v1/chat/completions"
 
-    api_key = args.api_key.strip('"') if args.api_key else ""
+    api_key = args.api_key.strip('"') if args.api_key else "EMPTY"
 
     headers = {
         "Content-Type": "application/json",
@@ -82,21 +63,6 @@ def gpt_api(system_prompt, user_prompt, args, few_shot=None):
             if 'error' not in result_json:
                 model_output = result_json['choices'][0]['message']['content']
 
-                # --- Log token usage for LangSmith metadata ---
-                usage = result_json.get('usage', {})
-                if usage and HAS_LANGSMITH:
-                    try:
-                        from langsmith import get_current_run_tree
-                        rt = get_current_run_tree()
-                        if rt:
-                            rt.extra = rt.extra or {}
-                            rt.extra["token_usage"] = {
-                                "prompt_tokens": usage.get("prompt_tokens", 0),
-                                "completion_tokens": usage.get("completion_tokens", 0),
-                                "total_tokens": usage.get("total_tokens", 0),
-                            }
-                    except Exception:
-                        pass  # Tracing metadata is best-effort
 
                 return model_output.strip()
             else:

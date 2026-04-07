@@ -221,5 +221,7 @@ def process_source(target_source):
 
 
 if __name__ == "__main__":
-    for source in ['yelp', 'amazon', 'goodreads']:
+    # for source in ['yelp', 'amazon', 'goodreads']:
+    #     process_source(source)
+    for source in ['amazon']:
         process_source(source)
