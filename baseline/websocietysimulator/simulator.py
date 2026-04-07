@@ -171,6 +171,10 @@ class Simulator:
             raise RuntimeError("Interaction tool is not set. Use set_interaction_tool() to set it.")
 
         task_to_run = self.tasks[:number_of_tasks] if number_of_tasks is not None else self.tasks
+       
+       ## REMEMBER TO FIX
+        # task_to_run = self.tasks[400:500] if number_of_tasks is not None else self.tasks
+
         logger.info(f"Total tasks: {len(task_to_run)}")
 
         # 如果不启用多线程，使用原始的串行处理

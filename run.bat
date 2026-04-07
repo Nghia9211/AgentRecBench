@@ -87,10 +87,10 @@ for %%d in (%ds_choices%) do (
                     @REM python MemoryAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
                     @REM python DummyAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
                     @REM python RecHackerAgent_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
-                    @REM python Baseline666_baseline.py --task_set !DS! --scenario !SC! --provider !PROV! !MODEL_ARG!
+                    python Baseline666_baseline.py --task_set !DS! --scenario !SC! 
                     
                     @REM Currently Run On Server for Test Result
-                    python ARAGgcnAgentRetrie.py --task_set !DS! --scenario !SC! 
+                    @REM python ARAGgcnAgentRetrie.py --task_set !DS! --scenario !SC! 
 
                     set "TARGET_DIR=./results/!SC!"
                     set "FOUND_FILE="

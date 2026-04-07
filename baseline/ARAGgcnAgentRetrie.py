@@ -26,8 +26,6 @@ from plugin.src.ARAGgcnRetrie.processing_input import ReviewProcessor
 
 
 logging.basicConfig(level=logging.INFO)
-
-from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 
 from debug.utils.user2id import load_user_to_idx_map
@@ -98,9 +96,9 @@ class MyRecommendationAgent(RecommendationAgent):
                 history_review = str(filtered_reviews)
                 
                 input_tokens = num_tokens_from_string(history_review)
-                if input_tokens > 16000:
+                if input_tokens > 8000:
                     encoding = tiktoken.get_encoding("cl100k_base")
-                    history_review = encoding.decode(encoding.encode(history_review)[:16000])
+                    history_review = encoding.decode(encoding.encode(history_review)[:8000])
             else:
                 pass
         
@@ -122,6 +120,7 @@ class MyRecommendationAgent(RecommendationAgent):
         
         result = None
         result = final_state['final_rank_list']
+        print(result)
        
         try:
             print('Meta Output:',result)
@@ -133,7 +132,7 @@ class MyRecommendationAgent(RecommendationAgent):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with ARAG with GCN Context in UUA Agent")
+    parser = argparse.ArgumentParser(description="Run WebSocietySimulator with ARAG with GCN Context")
     parser.add_argument(
         '--task_set', 
         type=str, 
@@ -165,7 +164,7 @@ if __name__ == "__main__":
 
 
     " Load scenarios"
-    simulator.set_task_and_groundtruth(task_dir=f"../dataset/tasks2/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/tasks2/{scenario}/{task_set}/groundtruth")
+    simulator.set_task_and_groundtruth(task_dir=f"../dataset/tasks5/{scenario}/{task_set}/tasks", groundtruth_dir=f"../dataset/tasks5/{scenario}/{task_set}/groundtruth")
 
     " Set Agent"
     simulator.set_agent(MyRecommendationAgent)
@@ -173,9 +172,14 @@ if __name__ == "__main__":
     " Set LLM client - CHANGE API KEY "
     load_dotenv()
     " -- OPEN AI -- "
-    openai_api_key = os.getenv("OPEN_API_KEY")
-    model = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
-
+    model = ChatOpenAI(
+        model="qwen-small",                
+        openai_api_key="EMPTY",            
+        openai_api_base="http://localhost:8036/v1", 
+        temperature=0.1,
+        max_tokens=2048,
+        timeout=120
+    )
 
     arag_recommender = ARAGgcnRetrieRecommender(
         model=model, 
@@ -193,10 +197,10 @@ if __name__ == "__main__":
     " Note : If you set the number of tasks = None, the simulator will run all tasks."
 
     " Option 1: No Threading "
-    agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=False)
+    # agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=False)
 
     " Option 2: Threading - Max_workers = Numbers of Threads"
-    # agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers =5)
+    agent_outputs = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers =20)
 
     " Evaluate Result "
     evaluation_results = simulator.evaluate()

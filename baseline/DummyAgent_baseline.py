@@ -2,9 +2,9 @@ import json
 from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
-from websocietysimulator.llm import LLMBase
+from websocietysimulator.llm import LLMBase,OpenAILLM
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningBase
-from utils.llm_provider import add_llm_args, build_llm_from_args
+from utils.llm_provider import add_llm_args
 import re
 import logging
 import argparse
@@ -28,7 +28,7 @@ class RecReasoning(ReasoningBase):
 
     def __call__(self, task_description: str):
         messages = [{"role": "user", "content": task_description}]
-        return self.llm(messages=messages, temperature=0.1, max_tokens=1000)
+        return self.llm(messages=messages, temperature=0.1, max_tokens=500)
 
 
 class MyRecommendationAgent(RecommendationAgent):
@@ -60,9 +60,9 @@ class MyRecommendationAgent(RecommendationAgent):
             for r in all_reviews if r.get('item_id') not in candidate_ids
         ]
         history_review = str(filtered_reviews)
-        if num_tokens_from_string(history_review) > 16000:
+        if num_tokens_from_string(history_review) > 8000:
             enc = tiktoken.get_encoding("cl100k_base")
-            history_review = enc.decode(enc.encode(history_review)[:16000])
+            history_review = enc.decode(enc.encode(history_review)[:8000])
 
         item_list = []
         for item_id in self.task['candidate_list']:
@@ -105,17 +105,21 @@ if __name__ == "__main__":
     scenario = args.scenario
 
     load_dotenv()
-    llm = build_llm_from_args(args, mode="simulator")
+    llm = OpenAILLM(
+    api_key="EMPTY", 
+    model="qwen-small", 
+    base_url="http://localhost:8036/v1"
+    )
 
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True)
     simulator.set_task_and_groundtruth(
-        task_dir=f"../dataset/tasks2/{scenario}/{task_set}/tasks",
-        groundtruth_dir=f"../dataset/tasks2%/{scenario}/{task_set}/groundtruth",
+        task_dir=f"../dataset/tasks5/{scenario}/{task_set}/tasks",
+        groundtruth_dir=f"../dataset/tasks5/{scenario}/{task_set}/groundtruth",
     )
     simulator.set_agent(MyRecommendationAgent)
     simulator.set_llm(llm)
 
-    agent_outputs      = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers=10)
+    agent_outputs      = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers=20)
     evaluation_results = simulator.evaluate()
 
     os.makedirs(f'./results/{scenario}', exist_ok=True)

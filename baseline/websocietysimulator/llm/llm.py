@@ -237,19 +237,17 @@ class FlowLLM(LLMBase):
         return self.usage_input, self.usage_output
 
 class OpenAILLM(LLMBase):
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    # 1. Sửa __init__ để nhận thêm base_url
+    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo", base_url: str = None):
         """
-        Initialize OpenAI LLM
-        
-        Args:
-            api_key: OpenAI API key
-            model: Model name, defaults to gpt-3.5-turbo
+        Initialize OpenAI LLM (Supports custom base_url for vLLM/Ollama)
         """
         super().__init__(model)
-        self.client = OpenAI(api_key=api_key)
-        self.embedding_model = OpenAIEmbeddings(api_key=api_key)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         
-    def __call__(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.0, max_tokens: int = 500, stop_strs: Optional[List[str]] = None, n: int = 1) -> Union[str, List[str]]:
+        self.embedding_model = OpenAIEmbeddings(api_key=api_key, openai_api_base=base_url)
+        
+    def __call__(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.0, max_tokens: int = 12000, stop_strs: Optional[List[str]] = None, n: int = 1) -> Union[str, List[str]]:
         """
         Call OpenAI API to get response
         

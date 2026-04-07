@@ -3,7 +3,7 @@ from websocietysimulator import Simulator
 from websocietysimulator.agent import RecommendationAgent
 import tiktoken
 import argparse
-from websocietysimulator.llm import LLMBase
+from websocietysimulator.llm import LLMBase,OpenAILLM
 from websocietysimulator.agent.modules.memory_modules import MemoryDILU
 from websocietysimulator.agent.modules.reasoning_modules import ReasoningIO
 from utils.llm_provider import add_llm_args, build_llm_from_args
@@ -26,8 +26,9 @@ def num_tokens_from_string(string: str) -> int:
 class MyRecommendationAgent(RecommendationAgent):
     def __init__(self, llm: LLMBase):
         super().__init__(llm=llm)
-        self.reasoning = ReasoningIO(profile_type_prompt='', memory=None, llm=self.llm)
         self.memory    = MemoryDILU(llm=self.llm)
+        self.reasoning = ReasoningIO(profile_type_prompt='', memory=MemoryDILU(llm=self.llm), llm=self.llm)
+
 
     def workflow(self):
         plan = [
@@ -40,9 +41,9 @@ class MyRecommendationAgent(RecommendationAgent):
         for sub_task in plan:
             if 'user' in sub_task['description']:
                 user = str(self.interaction_tool.get_user(user_id=self.task['user_id']))
-                if num_tokens_from_string(user) > 12000:
+                if num_tokens_from_string(user) > 1000:
                     enc = tiktoken.get_encoding("cl100k_base")
-                    user = enc.decode(enc.encode(user)[:12000])
+                    user = enc.decode(enc.encode(user)[:1000])
 
             elif 'item' in sub_task['description']:
                 keys = ['item_id', 'name', 'stars', 'review_count', 'attributes',
@@ -59,16 +60,20 @@ class MyRecommendationAgent(RecommendationAgent):
                 all_reviews      = self.interaction_tool.get_reviews(user_id=self.task['user_id'])
                 candidate_ids    = set(self.task['candidate_list'])
                 filtered_reviews = [r for r in all_reviews if r.get('item_id') not in candidate_ids]
-                history_review   = str(filtered_reviews)
-                if num_tokens_from_string(history_review) > 16000:
+                history_review = str(filtered_reviews[-15:]) 
+                if num_tokens_from_string(history_review) > 8000:
                     enc = tiktoken.get_encoding("cl100k_base")
-                    history_review = enc.decode(enc.encode(history_review)[:16000])
+                    history_review = enc.decode(enc.encode(history_review)[:8000])
 
         retrieved_memory = ''
         if filtered_reviews:
-            for his in filtered_reviews:
+            for his in filtered_reviews[-15:]:
                 self.memory.addMemory(str(his))
             retrieved_memory = self.memory.retriveMemory(f"History review of {self.task['user_id']}")
+        
+        if num_tokens_from_string(retrieved_memory) > 8000:
+            enc = tiktoken.get_encoding("cl100k_base")
+            retrieved_memory = enc.decode(enc.encode(retrieved_memory)[:8000])
 
         task_description = f"""
 You are a recommendation agent. Your task is to recommend items for a user based on their profile, historical reviews, and a list of candidate items.
@@ -115,17 +120,21 @@ if __name__ == "__main__":
     scenario = args.scenario
 
     load_dotenv()
-    llm = build_llm_from_args(args, mode="simulator")
+    llm = OpenAILLM(
+    api_key="EMPTY", 
+    model="qwen-small", 
+    base_url="http://localhost:8036/v1"
+    )
 
     simulator = Simulator(data_dir="../dataset/output_data_all/", device="gpu", cache=True)
     simulator.set_task_and_groundtruth(
-        task_dir=f"../dataset/tasks2/{scenario}/{task_set}/tasks",
-        groundtruth_dir=f"../dataset/tasks2/{scenario}/{task_set}/groundtruth",
+        task_dir=f"../dataset/tasks5/{scenario}/{task_set}/tasks",
+        groundtruth_dir=f"../dataset/tasks5/{scenario}/{task_set}/groundtruth",
     )
     simulator.set_agent(MyRecommendationAgent)
     simulator.set_llm(llm)
 
-    agent_outputs      = simulator.run_simulation(number_of_tasks=100, enable_threading=True, max_workers=10)
+    agent_outputs      = simulator.run_simulation(number_of_tasks=None, enable_threading=True, max_workers=20)
     evaluation_results = simulator.evaluate()
 
     os.makedirs(f'./results/{scenario}', exist_ok=True)
