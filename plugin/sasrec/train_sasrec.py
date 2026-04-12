@@ -14,7 +14,7 @@ sys.path.append(parent_dir)
 
 from dataset.general_dataset import GeneralDataset
 from utils.model import SASRec
-from utils.trainingfigure import plot_training_results
+from AgentRecBench.plugin.sasrec.trainingfigure import plot_training_results
 
 def main():
     parser = argparse.ArgumentParser()

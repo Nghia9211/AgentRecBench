@@ -69,7 +69,7 @@ class ScoreCombiner:
     """
 
     # Boost alpha mỗi round thêm dialogue (feedback loop)
-    EPOCH_ALPHA_BOOST: float = 0.05
+    EPOCH_ALPHA_BOOST: float = 0.00
 
     def __init__(self, cfg: ScoreConfig = None):
         self.cfg = cfg or DEFAULT_CONFIG.scoring
@@ -107,10 +107,6 @@ class ScoreCombiner:
 
         # ── Base alpha theo dataset ───────────────────────────────────────
         alpha = self.cfg.dataset_alpha.get(dataset, self.cfg.alpha)
-
-        # ── Cold-start penalty ────────────────────────────────────────────
-        if len_seq < self.cfg.cold_start_threshold:
-            alpha += self.cfg.cold_start_penalty
 
         # ── Confidence bonus (nếu có fused_scores) ───────────────────────
         if fused_scores:

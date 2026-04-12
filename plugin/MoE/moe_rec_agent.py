@@ -1,12 +1,3 @@
-"""
-moe_fusion/moe_rec_agent.py
-────────────────────────────
-Feedback Loop 4.0: Soft Penalty (Phạt Mềm)
-  - KHÔNG xóa bất kỳ item nào khỏi phễu.
-  - Giảm điểm (Score Discounting) của những item bị reject ở round trước.
-  - Bảo vệ Ground Truth khỏi sự "đánh giá sai" của User Simulator.
-"""
-
 import os
 import sys
 import threading
@@ -26,8 +17,6 @@ from gating_network      import GatingNetwork
 from moe_fusion          import MoEFusion
 from reranker            import Reranker
 from score_combiner      import ScoreCombiner
-
-from utils.rw_process import write_jsonl, read_jsonl
 
 class MoERecAgent:
     _shared_embedding      = None
@@ -49,7 +38,7 @@ class MoERecAgent:
         self.item_name_map = item_name_map or {}
         self.llm           = llm
         self.dataset = next((d for d in ['yelp', 'amazon', 'goodreads'] if d in getattr(args, 'data_dir', '')), 'amazon')
-        self.cfg = moe_config or get_config_for_dataset(self.dataset)
+        self.cfg = get_config_for_dataset()
 
         with MoERecAgent._init_lock:
             self._init_shared_resources(args)
@@ -101,8 +90,7 @@ class MoERecAgent:
             with open(os.path.join(args.data_dir, 'id2name.txt'), encoding='utf-8') as f:
                 for line in f:
                     ll = line.strip().split('::', 1)
-                    if len(ll) == 2:
-                        id2name[int(ll[0])], name2id[ll[1].strip()] = ll[1].strip(), int(ll[0])
+                    if len(ll) == 2: id2name[int(ll[0])], name2id[ll[1].strip()] = ll[1].strip(), int(ll[0])
             rawid_path = os.path.join(args.data_dir, 'id2rawid.txt')
             if os.path.exists(rawid_path):
                 with open(rawid_path, encoding='utf-8') as f:
@@ -122,9 +110,12 @@ class MoERecAgent:
         self.seq_scorer = SeqScorer.from_shared(shared)
         self.gcn_scorer = GCNScorer.from_shared(shared) if self.gcn_embeddings is not None else None
         self.sem_scorer = SemanticScorer.from_shared(shared)
+        
         self.retriever = CandidateRetriever(
             seq_scorer=self.seq_scorer, gcn_scorer=self.gcn_scorer, sem_scorer=self.sem_scorer,
-            config=self.cfg.retrieval, use_seq=self.cfg.use_seq, use_gcn=self.cfg.use_gcn and self.gcn_scorer is not None, use_semantic=self.cfg.use_semantic and self.vector_store is not None,
+            config=self.cfg.retrieval, use_seq=self.cfg.use_seq, 
+            use_gcn=self.cfg.use_gcn and self.gcn_scorer is not None, 
+            use_semantic=self.cfg.use_semantic and self.vector_store is not None,
         )
         self.gating = GatingNetwork(cfg=self.cfg.gating, model_path=getattr(self.args, 'gating_model_path', self.cfg.gating_model_path), device=self.device)
         self.fuser = MoEFusion(gating=self.gating, cfg=self.cfg)
@@ -141,9 +132,11 @@ class MoERecAgent:
         except Exception: return []
 
     def act(self, data: dict, reason: str = None, item: str = None, epoch: int = None, rejected_items: List[str] = None) -> Tuple[str, List[str], dict]:
-        user_id = data.get('id', 'unknown')
+        raw_id = data.get('id', data.get('user_id', 'unknown'))
+        user_id = str(raw_id[0] if isinstance(raw_id, list) else raw_id)
+        data['id'] = user_id
+        
         if epoch is None: epoch = len(self.memory) + 1
-        rejected_items = rejected_items or []
 
         try:
             gt_item = data.get('correct_answer', '').strip()
@@ -151,30 +144,21 @@ class MoERecAgent:
                 reviews = self._get_filtered_reviews(data)
                 if reviews: data['reviews'] = reviews
 
-            # 1. Retrieval (KHÔNG XÓA BẤT KỲ ITEM NÀO)
             union_names, signal_scores = self.retriever.retrieve_from_data(data)
 
-            # 2. Fusion (KHÔNG XÓA)
-            c_m, fused_scores, fusion_debug = self.fuser.fuse_from_data(data=data, signal_scores=signal_scores, debug=True)
+            c_m, fused_scores, fusion_debug = self.fuser.fuse_from_data(
+                data=data, 
+                signal_scores=signal_scores, 
+                debug=True
+            )
             if not c_m: c_m = union_names[:self.cfg.retrieval.top_M]
 
-            # 3. Reranker đọc Lời chê nhưng đánh giá trên toàn bộ tập c_m gốc
             ranked, rerank_scores, explanation = self.reranker.rerank(data=data, c_m=c_m, id2name=self.id2name, name2id=self.name2id, memory=self.memory)
 
-            # 4. Combine Scores
             cm_fused = {name: fused_scores.get(name, 0.0) for name in c_m}
             c_k_raw, s1_scores, combine_debug = self.combiner.combine_from_pipeline(fused_scores=cm_fused, rerank_scores=rerank_scores, data=data, args=self.args, top_k=self.cfg.retrieval.top_M, epoch=epoch)
 
-            # ── [FL 4.0] BƯỚC QUAN TRỌNG: SOFT PENALTY (PHẠT MỀM) ──
-            PENALTY_FACTOR = 0.6 
-            for item in rejected_items:
-                if item in s1_scores:
-                    s1_scores[item] = s1_scores[item] * PENALTY_FACTOR
-
-            # 5. Sắp xếp lại danh sách sau khi đã phạt mềm
             c_k_sorted = sorted(c_k_raw, key=lambda x: s1_scores.get(x, 0.0), reverse=True)
-            
-            # Lấy Top K cuối cùng
             c_k = c_k_sorted[:self.cfg.retrieval.top_K]
             
             if len(c_k) < self.cfg.retrieval.top_K:
@@ -182,12 +166,23 @@ class MoERecAgent:
                     if name not in c_k: c_k.append(name)
                     if len(c_k) >= self.cfg.retrieval.top_K: break
 
+            avg_gates = fusion_debug.get('avg_gates', {'seq': 0.0, 'gcn': 0.0, 'sem': 0.0})
+            
             debug_info = {
-                'gt_item': gt_item, 'alpha': combine_debug.get('alpha', 0.0), 'top_M_size': len(c_m),
-                'c_m_top_k_before_rerank': c_m[:self.cfg.retrieval.top_K], 'c_k_final_after_rerank': c_k,
-                'scores_breakdown': {item: {'s0_moe': fused_scores.get(item, 0.0), 's_rerank': rerank_scores.get(item, 0.0) if rerank_scores else 0.0, 's1_final': s1_scores.get(item, 0.0)} for item in c_k}
+                'gt_item': gt_item, 
+                'alpha': combine_debug.get('alpha', 0.0), 
+                'top_M_size': len(c_m),
+                'avg_gates': avg_gates, 
+                'c_m_top_k_before_rerank': c_m[:self.cfg.retrieval.top_K], 
+                'c_k_final_after_rerank': c_k,
+                'scores_breakdown': {
+                    item: {
+                        's0_moe': fused_scores.get(item, 0.0), 
+                        's_rerank': rerank_scores.get(item, 0.0) if rerank_scores else 0.0, 
+                        's1_final': s1_scores.get(item, 0.0)
+                    } for item in c_k
+                }
             }
-
             return explanation or "MoE pipeline recommendation.", c_k, debug_info
 
         except Exception as e:

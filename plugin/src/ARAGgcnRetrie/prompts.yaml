@@ -27,12 +27,19 @@ nli_scoring:
     - score: float 0.0–10.0  (8–10 = strong fit, 5–7.9 = partial, <5 = poor)
     - rationale: ≤1 sentence citing specific evidence from both sides
     - score MUST be a number, not a string
+    - Please output the result in JSON format.
+
+    You must return a JSON object with exactly these keys:
+    - "item_id": the string ID "{item_id}"
+    - "score": a number from 0 to 10
+    - "rationale": your reasoning
 
     USER PROFILE:
     {user_preferences}
 
     ITEM (id={item_id}):
     {item}
+    
 
 context_summary:
   template: |
@@ -55,6 +62,7 @@ item_ranking:
     - ranked_list: item_id + name only (no other fields)
     - explanation: ≤2 sentences, ≤50 words, top-2 picks only, plain text
     - Priority order: immediate intent → core preferences → novelty
+    - Please output the result in JSON format.
 
     USER PROFILE:
     {user_summary}
@@ -64,3 +72,13 @@ item_ranking:
 
     ITEMS:
     {items_to_rank_str}
+
+    Instruction: Rank the items above based on user preferences.
+    You MUST return a JSON object with this exact structure:
+    {{
+      "ranked_list": [
+        {{"item_id": "ID_HERE", "name": "NAME_HERE"}},
+        {{"item_id": "ID_HERE", "name": "NAME_HERE"}}
+      ],
+      "explanation": "Brief explanation why..."
+    }}

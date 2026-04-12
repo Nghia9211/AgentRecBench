@@ -1,12 +1,5 @@
 import os
-import time
-import argparse
-import json
 import torch
-from tqdm import tqdm
-import random
-from torch.utils.data import Dataset, DataLoader
-import multiprocessing
 import sys
 import pandas as pd
 import numpy as np
@@ -20,72 +13,8 @@ import model
 
 sys.modules['SASRecModules_ori'] = model
 
-from utils.regular_function import split_user_response, split_rec_reponse
-from utils.rw_process import append_jsonl, write_jsonl, read_jsonl
-from utils.api_request import api_request
+from utils.helper_function import write_jsonl, read_jsonl, api_request
 from utils.model import SASRec
-
-class RecAgent:
-    def __init__(self, args, mode='prior_rec'):
-        self.memory = []
-        self.info_list = []
-        self.args = args
-        self.mode = mode
-        self.load_prompt()
-
-    def load_prompt(self):
-        if self.mode =='prior_rec':
-            if 'amazon' in self.args.data_dir:
-                from constant.amazon_prior_model_prompt import rec_system_prompt, rec_user_prompt, rec_memory_system_prompt, rec_memory_user_prompt, rec_build_memory
-            elif 'goodreads' in self.args.data_dir:
-                from constant.goodreads_prior_model_prompt import rec_system_prompt, rec_user_prompt, rec_memory_system_prompt, rec_memory_user_prompt, rec_build_memory
-            elif 'yelp' in self.args.data_dir:
-                from constant.yelp_prior_model_prompt import rec_system_prompt, rec_user_prompt, rec_memory_system_prompt, rec_memory_user_prompt, rec_build_memory
-            else:
-                raise ValueError("Invalid mode: {}".format(self.args.data_dir))
-            self.rec_system_prompt = rec_system_prompt
-            self.rec_user_prompt = rec_user_prompt
-            self.rec_memory_system_prompt = rec_memory_system_prompt
-            self.rec_memory_user_prompt = rec_memory_user_prompt
-            self.rec_build_memory = rec_build_memory
-        else:
-            raise ValueError("Invalid mode: {}".format(self.mode))
-
-    def act(self, data, reason=None, item=None):
-        if self.mode =='prior_rec':
-            try:
-                if len(self.memory) == 0:
-                    system_prompt = self.rec_system_prompt
-                    user_prompt = self.rec_user_prompt.format(data['seq_str'], data['len_cans'], data['cans_str'], data['prior_answer'])
-                else:
-                    system_prompt = self.rec_memory_system_prompt
-                    user_prompt = self.rec_memory_user_prompt.format(data['seq_str'], data['len_cans'], data['cans_str'], '\n'.join(self.memory))
-                response = api_request(system_prompt, user_prompt, self.args)
-                print(f"Response : {response} ")
-                return response
-            except Exception as e:
-                print(f"LỖI KHI GỌI MODEL TRONG REC_AGENT (User ID: {data.get('id', 'N/A')}): {e}")
-                import traceback
-                traceback.print_exc()
-                return None
-        else:
-            raise ValueError("Invalid mode: {}".format(self.mode))
-
-    def build_memory(self, info):
-        rec_item_str = ', '.join(info['rec_item_list']) if isinstance(info.get('rec_item_list'), list) else info.get('rec_item')
-        return self.rec_build_memory.format(info['epoch'], rec_item_str, info['rec_reason'], info['user_reason'])
-
-    def update_memory(self, info):
-        self.info_list.append(info)
-        self.memory.append(self.build_memory(info))
-
-    def save_memory(self, path):
-        write_jsonl(path, self.info_list)
-
-    def load_memory(self, path):
-        self.info_list = read_jsonl(path)
-        self.memory = [self.build_memory(info) for info in self.info_list]
-
 
 class UserModelAgent:
     def __init__(self, args, mode='prior_rec', shared_sasrec=None):
@@ -183,27 +112,57 @@ class UserModelAgent:
             self.user_build_memory = user_build_memory
             self.user_build_memory_2 = user_build_memory_2
 
-    def act(self, data, reason=None, item_list=None):
+    def act(self, data, reason=None, item_list=None, docstore_cache=None):
         if self.mode == 'prior_rec':
-            rec_list_str = ', '.join(item_list) if item_list else "None"
+            
+            # --- HOOK: Bơm Metadata vào Tên Item (Chống Ảo giác LLM) ---
+            def enrich(items_input):
+                if not items_input:
+                    return "None"
+                # Nếu input là string (như seq_str), cắt thành list
+                items = [i.strip() for i in items_input.split(',')] if isinstance(items_input, str) else items_input
+                if not docstore_cache:
+                    return ", ".join(items)
+                
+                enriched = []
+                for item in items:
+                    key = item.lower()
+                    if key in docstore_cache:
+                        rich_text = docstore_cache[key]
+                        parts = rich_text.split(' | ')
+                        # Lấy đoạn 2 và 3 (Thường là Category, Brand, Format)
+                        if len(parts) > 1:
+                            meta = " | ".join(parts[1:3])
+                            # Cắt ngắn meta info nếu quá dài (max 15 từ)
+                            words = meta.split()
+                            if len(words) > 15:
+                                meta = " ".join(words[:15]) + "..."
+                            enriched.append(f"{item} [{meta}]")
+                            continue
+                    enriched.append(item)
+                return ", ".join(enriched)
+            # -------------------------------------------------------------
+
+            # Áp dụng enrich cho History và List Gợi ý
+            enriched_seq_str = enrich(data['seq_str'])
+            enriched_rec_list_str = enrich(item_list)
+            enriched_cans_str = enrich(data.get('cans_str', ''))
 
             if len(self.memory) == 0:
-                
-                system_prompt = self.user_system_prompt.format(data['seq_str'])
+                system_prompt = self.user_system_prompt.format(enriched_seq_str)
                 user_prompt = self.user_user_prompt.format(
-                    data['cans_str'],
-                     data['seq_str'],   
-                    rec_list_str,
+                    enriched_cans_str,
+                    enriched_seq_str,   
+                    enriched_rec_list_str,
                     reason,
                 )
             else:
-                # FIX: chỉ truyền seq_str, bỏ prior_answer khỏi system_prompt
-                system_prompt = self.user_memory_system_prompt.format(data['seq_str'])
+                system_prompt = self.user_memory_system_prompt.format(enriched_seq_str)
                 user_prompt = self.user_memory_user_prompt.format(
-                    data['cans_str'],
-                    data['seq_str'],   
+                    enriched_cans_str,
+                    enriched_seq_str,   
                     '\n'.join(self.memory),
-                    rec_list_str,
+                    enriched_rec_list_str,
                     reason,
                 )
 
@@ -239,57 +198,6 @@ class UserModelAgent:
     def load_memory(self, path):
         self.info_list = read_jsonl(path)
         self.memory = [self.build_memory(info) for info in self.info_list]
-
-    # ------------------------------------------------------------------
-    # Strategy 3: Dynamic Sequence Augmentation helpers
-    # ------------------------------------------------------------------
-
-    def update_dynamic_sequence(self, data, positive_item_names):
-        if not positive_item_names:
-            return 0
-
-        seq_unpad = list(data.get('seq_unpad', []))
-        padding_id = self.item_num
-        added = 0
-
-        for name in positive_item_names:
-            item_id = self.name2id.get(name.strip())
-            if item_id is None or item_id >= self.item_num:
-                continue
-            if seq_unpad and seq_unpad[-1] == item_id:
-                continue
-            seq_unpad.append(item_id)
-            added += 1
-
-        if added == 0:
-            return 0
-
-        if len(seq_unpad) > self.seq_size:
-            seq_unpad = seq_unpad[-self.seq_size:]
-
-        new_len = len(seq_unpad)
-        padded = [padding_id] * (self.seq_size - new_len) + seq_unpad
-
-        data['seq'] = padded
-        data['len_seq'] = new_len
-        data['seq_unpad'] = seq_unpad
-
-        if '_original_seq_str' not in data:
-            data['_original_seq_str'] = data.get('seq_str', 'Empty History')
-            data['_original_seq_len'] = data.get('len_seq', 0) - added
-
-        original_str = data['_original_seq_str']
-        original_len = data['_original_seq_len']
-
-        all_pseudo_ids = seq_unpad[original_len:] if original_len >= 0 else seq_unpad
-        all_pseudo_names = [self.id2name.get(iid, f'Item_{iid}') for iid in all_pseudo_ids]
-
-        if original_str == 'Empty History':
-            data['seq_str'] = 'Inferred interests: ' + ', '.join(all_pseudo_names)
-        else:
-            data['seq_str'] = original_str + ' | Inferred interests: ' + ', '.join(all_pseudo_names)
-
-        return added
 
     def regenerate_prior(self, data):
         data['prior_answer'] = self.model_generate(

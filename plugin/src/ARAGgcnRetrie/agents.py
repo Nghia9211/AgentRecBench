@@ -13,7 +13,6 @@ from .utils import (
     find_top_k_similar_items, normalize_item,
     get_gcn_latent_interests, get_user_understanding, get_user_summary,sanitize_prompt
 )
-from .metric import evaluate_hit_rate
 
 
 class ARAGAgents:
@@ -24,7 +23,7 @@ class ARAGAgents:
         self.embedding_function = embedding_function
         self.gcn_embeddings   = None
         self.encoding = tiktoken.get_encoding("cl100k_base")
-        self.max_context_tokens = 16000  
+        self.max_context_tokens = 8000
 
         if gcn_path:
             try:
@@ -33,11 +32,6 @@ class ARAGAgents:
             except Exception as e:
                 print(f"WARNING: Could not load GCN embeddings: {e}")
 
-    def _gt_path(self, state):
-        return (
-            f"C:/Users/Admin/Desktop/Document/AgenticCode/AgentRecBench"
-            f"/dataset/task/user_cold_start/{state['task_set']}/groundtruth"
-        )
     def _truncate_context_by_tokens(self, data_list, max_tokens=None):
         """
         Truncate a list of review/context items to fit within token limit.
@@ -49,14 +43,12 @@ class ARAGAgents:
         if not data_list:
             return [], 0
             
-        # Convert list to string representation
         content_str = json.dumps(data_list, ensure_ascii=False)
         tokens = self.encoding.encode(content_str)
         
         if len(tokens) <= max_tokens:
             return data_list, len(tokens)
         
-        # Truncate items one by one until we fit
         truncated_list = []
         current_tokens = 0
         
@@ -79,10 +71,6 @@ class ARAGAgents:
             state['long_term_ctx'], 
             max_tokens=self.max_context_tokens - 500  
         )
-        
-        
-        print(f"\n[Token Management] Long-term context: {lt_tokens} tokens (truncated from {len(long_term_ctx_trunc)} to {len(long_term_ctx_trunc)} items)")
-        
 
         gcn_insight = get_gcn_latent_interests(
             history_ids, self.gcn_embeddings, state['candidate_list']
@@ -98,10 +86,7 @@ class ARAGAgents:
         top_k    = find_top_k_similar_items(
             query, state['candidate_list'], self.embedding_function, k=5
         )
-        evaluate_hit_rate(
-            index=state['idx'], stage="1_Initial_Retrieval",
-            items=top_k, gt_folder=self._gt_path(state), task_set=state['task_set'],
-        )
+
         return {'top_k_candidate': top_k}
 
     # ── 3. NLI AGENT ────────────────────────────────────────────────────────
@@ -137,10 +122,6 @@ class ARAGAgents:
         if not positive:
             output_state['final_rank_list'] = [str(item.get('item_id')) for item in state['candidate_list']]
 
-        evaluate_hit_rate(
-            index=state['idx'], stage="2_NLI_Filtering",
-            items=positive, gt_folder=self._gt_path(state), task_set=state['task_set'],
-        )
         return output_state
 
     # ── 4. CONTEXT SUMMARY ───────────────────────────────────────────────────

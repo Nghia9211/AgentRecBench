@@ -26,7 +26,7 @@ class RetrievalConfig:
 @dataclass
 class GatingConfig:
     """Config cho MLP gating network."""
-    input_dim:    int   = 3
+    input_dim:    int   = 4
     hidden_dims:  list  = field(default_factory=lambda: [16, 8])
     dropout:      float = 0.1
     lr:           float = 1e-3
@@ -34,9 +34,6 @@ class GatingConfig:
     batch_size:   int   = 256
     weight_decay: float = 1e-4
 
-    # Khởi tạo weights mặc định (trước khi train MLP)
-    # Amazon: balanced [1/3, 1/3, 1/3]
-    # Goodreads: FAISS áp đảo [0.1, 0.1, 0.8]
     default_weights: list = field(
         default_factory=lambda: [1/3, 1/3, 1/3]
     )
@@ -50,14 +47,11 @@ class ScoreConfig:
     alpha: float = 0.5
 
     dataset_alpha: Dict[str, float] = field(default_factory=lambda: {
-        'yelp':      0.5,   # dense → MoE base mạnh
+        'yelp':      0.5,   
         'amazon':    0.5,
-        'goodreads': 0.3,   # sparse → tin reranker content hơn s0
+        'goodreads': 0.5,  
     })
-    use_adaptive_alpha: bool = True
-
-    cold_start_threshold: int   = 3
-    cold_start_penalty:   float = -0.1
+    use_adaptive_alpha: bool = False
 
 
 @dataclass
@@ -77,7 +71,7 @@ class MoEConfig:
 DEFAULT_CONFIG = MoEConfig()
 
 
-def get_config_for_dataset(dataset: str) -> MoEConfig:
+def get_config_for_dataset() -> MoEConfig:
     """
     Trả về MoEConfig được tinh chỉnh cho từng dataset.
 
@@ -88,36 +82,10 @@ def get_config_for_dataset(dataset: str) -> MoEConfig:
     """
     cfg = MoEConfig()
 
-    if dataset == 'amazon':
-        cfg.retrieval.top_seq = 20
-        cfg.retrieval.top_gcn = 20
-        cfg.retrieval.top_sem = 20
-        cfg.retrieval.top_M   = 30
-        cfg.gating.default_weights = [1/3, 1/3, 1/3]
-
-    elif dataset == 'yelp':
-        cfg.retrieval.top_seq = 20
-        cfg.retrieval.top_gcn = 20
-        cfg.retrieval.top_sem = 20
-        cfg.retrieval.top_M   = 30
-        cfg.gating.default_weights = [0.5, 0.25, 0.25]
-
-    elif dataset == 'goodreads':
-        # ── Goodreads: sparse dataset, content-based wins ─────────────────
-        # GCN và SASRec gần như random (density 0.009%)
-        # → giảm top_seq và top_gcn tối đa
-        # → cho FAISS lấy nhiều candidates nhất
-        cfg.retrieval.top_seq = 20    # chỉ lấy 5 từ SASRec (tiebreaker)
-        cfg.retrieval.top_gcn = 20    # chỉ lấy 5 từ GCN (tiebreaker)
-        cfg.retrieval.top_sem = 20   # FAISS rich content dẫn dắt
-        cfg.retrieval.top_M   = 30   # C_M lớn hơn để sem có đất
-        cfg.retrieval.top_K   = 5
-
-        # Gating: FAISS chiếm 80% weight
-        cfg.gating.default_weights = [1.0, 0.0, 0.0]
-
-        # Alpha thấp: s0 yếu (vì seq/gcn yếu) → tin reranker content hơn
-        cfg.scoring.use_adaptive_alpha = True
-        # dataset_alpha['goodreads'] = 0.3 đã set trong ScoreConfig
+    cfg.retrieval.top_seq = 20
+    cfg.retrieval.top_gcn = 20
+    cfg.retrieval.top_sem = 20
+    cfg.retrieval.top_M   = 20
+    cfg.gating.default_weights = [1/3, 1/3, 1/3]
 
     return cfg
