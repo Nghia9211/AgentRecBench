@@ -19,7 +19,6 @@ class SemanticScorer:
         self.id2name = id2name
         self.name2id = name2id
         
-        # Nạp Docstore Cache để hỗ trợ Rich Content
         self._docstore_cache: Dict[str, str] = {}
         if vector_store is not None:
             self._build_docstore_cache()
@@ -52,7 +51,6 @@ class SemanticScorer:
             cand_vecs = np.array(self.embedding_function.embed_documents(candidate_texts), dtype=np.float32)
             sims = _cosine_sim(query_vec, cand_vecs)
             
-            # Min-Max Scaling Cục bộ
             min_s, max_s = float(sims.min()), float(sims.max())
             norm_sims = (sims - min_s) / (max_s - min_s) if max_s > min_s else np.full_like(sims, 0.5)
             
@@ -63,7 +61,6 @@ class SemanticScorer:
     def score(self, seq_str: str, candidate_ids: List[int], data: dict = None) -> Dict[str, float]:
         if not candidate_ids: return {}
         candidate_names = [self.id2name.get(cid, f"item_{cid}") for cid in candidate_ids]
-        # V4.0: Chỉ dùng query thô, không gọi LLM
         query = f"User interested in: {seq_str}"
         return self._embed_and_score(query, candidate_names)
 

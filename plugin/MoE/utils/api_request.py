@@ -11,7 +11,6 @@ def gpt_api(system_prompt, user_prompt, args, few_shot=None):
 
     # url = "https://api.openai.com/v1/chat/completions"
     if hasattr(args, 'base_url') and args.base_url:
-        # Đảm bảo url kết thúc bằng /chat/completions
         url = f"{args.base_url.rstrip('/')}/chat/completions"
     else:
         url = "https://api.openai.com/v1/chat/completions"
