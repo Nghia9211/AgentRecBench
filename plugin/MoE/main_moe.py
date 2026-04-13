@@ -1,7 +1,6 @@
 """
 main_moe.py
 ────────────
-Mode: MULTI-ROUND MoE (Feedback Loop 4.1 + NDCG Boost & Gates Tracker)
 """
 
 import argparse
@@ -80,19 +79,15 @@ def recommend_moe(data: dict, args) -> tuple:
     user_id    = data.get('id')
     llm_client = None
     
-    # --- FIX: KHỞI TẠO LLM ĐỘC LẬP VỚI RERANKER ---
-    # Luôn cố gắng khởi tạo LLM để dùng cho Semantic Profiling (Goal 5)
-    # hoặc LLM Reranker nếu được bật.
     try:
         from langchain_openai import ChatOpenAI
-        # Sử dụng api_key nếu có, ngược lại dùng "EMPTY" (thường dùng cho local LLM như vLLM/Ollama)
         key = args.api_key if args.api_key and args.api_key.lower() != 'none' else "EMPTY"
         llm_client = ChatOpenAI(
             model=args.model, 
             openai_api_key=key, 
             openai_api_base=args.base_url, 
             temperature=args.temperature, 
-            max_retries=3
+            max_retries=5
         )
     except ImportError:
         print(f"[MoE] Cảnh báo: Không thể import langchain_openai cho User {user_id}")
@@ -168,12 +163,10 @@ def recommend_moe(data: dict, args) -> tuple:
             ndcg_v1 = current_ndcg
 
         # --- GATES & SCORES TRACKING ---
-        # Lấy từ debug_info được truyền lên từ MoERecAgent
         gates = debug_info.get('avg_gates', {})
         if gates:
             gate_records.append([gates.get('seq', 0), gates.get('gcn', 0), gates.get('sem', 0)])
         
-        # Thống kê phân phối s0 và s_rerank của top items
         scores = debug_info.get('scores_breakdown', {})
         for it_name, s_vals in scores.items():
             score_records.append([s_vals.get('s0_moe', 0), s_vals.get('s_rerank', 0)])
@@ -202,10 +195,8 @@ def recommend_moe(data: dict, args) -> tuple:
         user_reason         = None
 
         for attempt in range(max_user_retries):
-            # Lấy Cache từ SemanticScorer (nằm trong MoERecAgent)
             cache = rec_agent.sem_scorer._docstore_cache if hasattr(rec_agent, 'sem_scorer') else None
             
-            # Truyền cache vào hàm act
             user_agent_response = user_agent.act(data, rec_reason, rec_item_list, docstore_cache=cache)
             user_reason, flag   = split_user_response(user_agent_response)
             if user_reason is not None and flag is not None:
@@ -279,8 +270,6 @@ def make_counters(manager):
 def setcallback_safe(result, counters, args):
     data_list, hit_at_n, _args, drop_logs, improve_logs, ndcg_v1, ndcg_final, gate_recs, score_recs = result
     for step in data_list: append_jsonl(args.output_file, step)
-
-    # --- LƯU LOG VÀO FILE ---
     output_dir = os.path.dirname(args.output_file) or '.'
     
     with counters['lock']:
@@ -382,7 +371,6 @@ def main(args):
     os.makedirs(os.path.dirname(args.output_file) or '.', exist_ok=True)
     output_dir = os.path.dirname(args.output_file) or '.'
     
-    # Reset các file log
     for f_name in ['feedback_rank_drop_log.txt', 'feedback_rank_improve_log.txt', 'ndcg_comparison_log.txt']:
         with open(os.path.join(output_dir, f_name), 'w', encoding='utf-8') as f:
             f.write(f"=== {f_name.upper()} ===\n")
@@ -405,11 +393,9 @@ def main(args):
         final_rank_drops   = counters['total_rank_drops'].value
         final_rank_improves = counters['total_rank_improves'].value
         
-        # Thống kê NDCG Boost
         avg_ndcg_v1 = counters['total_ndcg_v1'].value / total if total > 0 else 0
         avg_ndcg_final = counters['total_ndcg_final'].value / total if total > 0 else 0
         
-        # Thống kê Mean/Std
         all_gates = np.array(counters['gate_vals']) if counters['gate_vals'] else np.zeros((0,3))
         all_scores = np.array(counters['score_vals']) if counters['score_vals'] else np.zeros((0,2))
         
@@ -419,8 +405,6 @@ def main(args):
         score_std = all_scores.std(axis=0) if len(all_scores)>0 else [0,0]
 
     save_final_metrics(args, total, final_hit1, final_hit3, final_hit5, final_tot_ndcg)
-    
-    # Ghi file thống kê tổng hợp
 
     summary_text = (
         "=============================================\n"

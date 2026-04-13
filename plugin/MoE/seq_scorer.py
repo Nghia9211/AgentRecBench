@@ -1,13 +1,6 @@
 """
 moe_fusion/seq_scorer.py
 ────────────────────────
-Sequential scorer: tính s_seq(u, i) cho từng candidate item
-dựa trên SASRec model đã được train.
-
-Fix:
-  - len_seq và seq luôn được ép kiểu về Python int / List[int]
-    trước khi truyền vào forward_eval, tránh lỗi:
-    "only integer tensors of a single element can be converted to an index"
 """
 
 import numpy as np
@@ -16,7 +9,6 @@ from typing import Dict, List, Optional, Union
 
 
 def _to_int(x) -> int:
-    """Ép bất kỳ scalar (tensor, np.integer, float, int) về Python int."""
     if isinstance(x, torch.Tensor):
         return int(x.item())
     if isinstance(x, np.integer):
@@ -25,7 +17,6 @@ def _to_int(x) -> int:
 
 
 def _to_int_list(seq) -> List[int]:
-    """Ép sequence (tensor, ndarray, list) về List[int]."""
     if isinstance(seq, torch.Tensor):
         return seq.cpu().tolist()
     if isinstance(seq, np.ndarray):
@@ -34,15 +25,6 @@ def _to_int_list(seq) -> List[int]:
 
 
 class SeqScorer:
-    """
-    Wrap SASRec để tính sequential score cho từng (user, item) pair.
-
-    Interface:
-        scorer = SeqScorer(sasrec_model, id2name, item_num, device)
-        scores = scorer.score(seq, len_seq, candidate_ids)
-        # → Dict[item_name, float]
-    """
-
     def __init__(
         self,
         sasrec_model,
@@ -65,17 +47,6 @@ class SeqScorer:
         len_seq:       Union[int, torch.Tensor, np.integer],
         candidate_ids: List[int],
     ) -> Dict[str, float]:
-        """
-        Tính raw SASRec score cho từng candidate.
-
-        Args:
-            seq:           padded sequence — list, tensor, hoặc ndarray đều OK
-            len_seq:       actual sequence length — int, tensor scalar, np.integer đều OK
-            candidate_ids: list of inner item IDs cần score
-
-        Returns:
-            Dict[item_name → raw_score]  (chưa normalize)
-        """
         if not candidate_ids:
             return {}
 
@@ -90,7 +61,6 @@ class SeqScorer:
                 np.array([len_seq_int], dtype=np.int64),
             )
 
-        # Mask toàn bộ items không phải candidate
         mask = torch.ones(self.item_num, dtype=torch.bool)
         for cid in candidate_ids:
             if 0 <= cid < self.item_num:
@@ -117,7 +87,7 @@ class SeqScorer:
         candidate_ids: List[int],
         k:             int = 20,
     ) -> List[str]:
-        """Top-k item names (sorted desc) từ candidate_ids."""
+
         scores = self.score(seq, len_seq, candidate_ids)
         return sorted(scores, key=scores.get, reverse=True)[:k]
 

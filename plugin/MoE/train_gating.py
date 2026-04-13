@@ -1,11 +1,6 @@
 """
 moe_fusion/train_gating.py
 ───────────────────────────
-MoE Gating Network Offline Training (V4.0 - Stable Baseline)
-- Sử dụng Rich Text từ FAISS.
-- Min-Max Scaling cục bộ cho Semantic Signal.
-- KHÔNG dùng LLM Profiler lúc train (để tốc độ nhanh và đồng bộ inference).
-- Đầu vào mạng 4 chiều: [s_seq, s_gcn, s_sem, norm_len].
 """
 
 import os

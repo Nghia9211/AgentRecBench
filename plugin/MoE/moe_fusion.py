@@ -38,8 +38,6 @@ class MoEFusion:
         norm_seq = _zscore_normalize(raw_seq)
         norm_gcn = _zscore_normalize(raw_gcn)
         norm_sem = _zscore_normalize(raw_sem)
-
-        # Truyền RAW signals vào gating để tránh lỗi Double Normalization
         gate_weights = self.gating.predict(signal_scores, len_seq=len_seq)
 
         fused_scores: Dict[str, float] = {}

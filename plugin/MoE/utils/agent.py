@@ -32,7 +32,6 @@ class UserModelAgent:
         self.load_prompt()
 
         if shared_sasrec is not None:
-            # Tái sử dụng SASRec đã load từ ARAGRecAgent
             self.model    = shared_sasrec['model']
             self.id2name  = shared_sasrec['id2name']
             self.name2id  = shared_sasrec['name2id']
@@ -42,7 +41,6 @@ class UserModelAgent:
             self.device   = shared_sasrec['device']
             print("[UserModelAgent] Reusing shared SASRec — skipping reload.")
         else:
-            # Load bình thường khi dùng độc lập (không có ARAG)
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.id2name  = dict()
             self.name2id  = dict()
@@ -115,12 +113,12 @@ class UserModelAgent:
     def act(self, data, reason=None, item_list=None, docstore_cache=None):
         if self.mode == 'prior_rec':
             
-            # --- HOOK: Bơm Metadata vào Tên Item (Chống Ảo giác LLM) ---
             def enrich(items_input):
                 if not items_input:
                     return "None"
-                # Nếu input là string (như seq_str), cắt thành list
+                
                 items = [i.strip() for i in items_input.split(',')] if isinstance(items_input, str) else items_input
+                
                 if not docstore_cache:
                     return ", ".join(items)
                 
@@ -130,23 +128,35 @@ class UserModelAgent:
                     if key in docstore_cache:
                         rich_text = docstore_cache[key]
                         parts = rich_text.split(' | ')
-                        # Lấy đoạn 2 và 3 (Thường là Category, Brand, Format)
-                        if len(parts) > 1:
-                            meta = " | ".join(parts[1:3])
-                            # Cắt ngắn meta info nếu quá dài (max 15 từ)
-                            words = meta.split()
-                            if len(words) > 15:
-                                meta = " ".join(words[:15]) + "..."
-                            enriched.append(f"{item} [{meta}]")
-                            continue
-                    enriched.append(item)
-                return ", ".join(enriched)
-            # -------------------------------------------------------------
+                        
+                        meta_parts = []
+                        for p in parts:
+                            p_clean = p.strip()
+                            
+                            if p_clean.lower() == key:
+                                continue
 
-            # Áp dụng enrich cho History và List Gợi ý
+                            if ':' not in p_clean:
+                                continue
+                                
+                            meta_parts.append(p_clean)
+                        
+                        if meta_parts:
+                            meta = " | ".join(meta_parts[:2])
+                            enriched.append(f"{item} [{meta}]")
+                        else:
+                            enriched.append(item)
+                    else:
+                        enriched.append(item)
+                        
+                return ", ".join(enriched)
+
             enriched_seq_str = enrich(data['seq_str'])
+            print(f"Enriched Seq_str : {enriched_seq_str} \n")
             enriched_rec_list_str = enrich(item_list)
+            print(f"Enriched rec list : {enriched_rec_list_str} \n")
             enriched_cans_str = enrich(data.get('cans_str', ''))
+            print(f"Enriched cans_str : {enriched_cans_str} \n")
 
             if len(self.memory) == 0:
                 system_prompt = self.user_system_prompt.format(enriched_seq_str)

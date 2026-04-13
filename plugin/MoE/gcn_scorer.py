@@ -17,20 +17,6 @@ from typing import Dict, List, Optional
 
 
 class GCNScorer:
-    """
-    Tính GCN-based collaborative score cho từng candidate item.
-
-    Flow:
-      1. Lấy GCN embedding của từng item trong user history
-      2. h_user = weighted mean (gần đây → weight cao hơn)
-      3. s_gcn(i) = cosine_sim(h_user, gcn_emb[i])
-
-    Interface:
-        scorer = GCNScorer(gcn_embeddings, id2name, name2id)
-        scores = scorer.score(seq, len_seq, candidate_ids)
-        # → Dict[item_name, float]
-    """
-
     def __init__(
         self,
         gcn_embeddings: torch.Tensor,   # shape: [num_items+1, embed_dim]
@@ -54,13 +40,6 @@ class GCNScorer:
     # ─────────────────────────────────────────────────────────────────────
 
     def _user_embedding(self, seq: List[int], len_seq: int) -> Optional[torch.Tensor]:
-        """
-        Tổng hợp GCN embedding của user từ interaction history.
-        Dùng exponential decay weighting: item gần đây có weight cao hơn.
-
-        Returns:
-            Normalized user embedding (dim,) hoặc None nếu history rỗng.
-        """
         if len_seq == 0:
             return None
 
@@ -72,7 +51,7 @@ class GCNScorer:
         if not valid_ids:
             return None
 
-        # Exponential decay: item index lớn hơn (gần đây hơn) → weight cao
+        # Exponential decay
         n = len(valid_ids)
         weights = torch.tensor(
             [np.exp(0.1 * i) for i in range(n)],
@@ -81,7 +60,7 @@ class GCNScorer:
         )
         weights = weights / weights.sum()              # normalize
 
-        # Lấy embeddings
+        # embeddings
         ids_tensor = torch.tensor(valid_ids, dtype=torch.long, device=self.device)
         item_embs  = self.gcn_norm[ids_tensor]         # (n, dim)
 
@@ -101,23 +80,22 @@ class GCNScorer:
         candidate_ids: List[int],
     ) -> Dict[str, float]:
         """
-        Tính GCN score cho từng candidate.
+        GCN score for each candidate.
 
         Returns:
             Dict[item_name → cosine_score ∈ [-1, 1]]
-            Trả về dict rỗng nếu user không có history.
         """
         if not candidate_ids:
             return {}
 
         h_user = self._user_embedding(seq, len_seq)
         if h_user is None:
-            # Cold-start: fallback về uniform score
+            # Cold-start: fallback uniform score
             return {self.id2name.get(cid, f"item_{cid}"): 0.0
                     for cid in candidate_ids
                     if 0 <= cid < self.num_items}
 
-        # Lấy embeddings cho candidates
+        # embeddings candidates
         valid_cans = [(cid, self.id2name.get(cid, f"item_{cid}"))
                       for cid in candidate_ids
                       if 0 <= cid < self.num_items]
@@ -128,7 +106,7 @@ class GCNScorer:
                                   dtype=torch.long, device=self.device)
         can_embs   = self.gcn_norm[can_ids]            # (n_cans, dim)
 
-        # Cosine similarity = dot product (vì đã normalize)
+        # Cosine similarity = dot product 
         sims = (can_embs @ h_user).cpu().tolist()      # (n_cans,)
 
         return {name: float(sim)
@@ -152,9 +130,7 @@ class GCNScorer:
     @classmethod
     def from_shared(cls, shared: dict) -> "GCNScorer":
         """
-        Tạo GCNScorer từ dict shared resources.
-
-        shared phải có keys:
+        shared keys:
           'gcn_embeddings', 'id2name', 'name2id', 'device'
         """
         gcn_emb = shared.get('gcn_embeddings')

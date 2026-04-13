@@ -1,212 +1,178 @@
-import os
-import json
-import time
-import requests
-import re
+import torch
+from torch import nn
+import torch.nn.functional as F
 
-"""
-Save Final Metrics
-"""
 
-def save_final_metrics(args, total_samples, h1_count, h3_count, h5_count, ndcg5_score):
+def extract_axis_1(data, indices):
+    res = []
+    for i in range(data.shape[0]):
+        res.append(data[i, indices[i], :])
+    res = torch.stack(res, dim=0).unsqueeze(1)
+    return res
+
+class PositionwiseFeedForward(nn.Module):
+    def __init__(self, d_in, d_hid, dropout=0.1):
+        super().__init__()
+        self.w_1 = nn.Conv1d(d_in, d_hid, 1)
+        self.w_2 = nn.Conv1d(d_hid, d_in, 1)
+        self.layer_norm = nn.LayerNorm(d_in)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        residual = x
+        output = x.transpose(1, 2)
+        output = self.w_2(F.relu(self.w_1(output)))
+        output = output.transpose(1, 2)
+        output = self.dropout(output)
+        output = self.layer_norm(output + residual)
+        return output
     
-    h1_rate = h1_count / total_samples if total_samples > 0 else 0
-    h3_rate = h3_count / total_samples if total_samples > 0 else 0
-    h5_rate = h5_count / total_samples if total_samples > 0 else 0
+class MultiHeadAttention(nn.Module):
+    def __init__(self, hidden_size, num_units, num_heads, dropout_rate):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+        assert hidden_size % num_heads == 0
+        
+        self.linear_q = nn.Linear(hidden_size, num_units)
+        self.linear_k = nn.Linear(hidden_size, num_units)
+        self.linear_v = nn.Linear(hidden_size, num_units)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.softmax = nn.Softmax(dim=-1)
+
+
+    def forward(self, queries, keys):
+        """
+        :param queries: A 3d tensor with shape of [N, T_q, C_q]
+        :param keys: A 3d tensor with shape of [N, T_k, C_k]
+        
+        :return: A 3d tensor with shape of (N, T_q, C)
+        
+        """
+        Q = self.linear_q(queries)  # (N, T_q, C)
+        K = self.linear_k(keys)  # (N, T_k, C)
+        V = self.linear_v(keys)  # (N, T_k, C)
+        
+        # Split and Concat
+        split_size = self.hidden_size // self.num_heads
+        Q_ = torch.cat(torch.split(Q, split_size, dim=2), dim=0)  # (h*N, T_q, C/h)
+        K_ = torch.cat(torch.split(K, split_size, dim=2), dim=0)  # (h*N, T_k, C/h)
+        V_ = torch.cat(torch.split(V, split_size, dim=2), dim=0)  # (h*N, T_k, C/h)
+        
+        # Multiplication
+        matmul_output = torch.bmm(Q_, K_.transpose(1, 2)) / self.hidden_size ** 0.5  # (h*N, T_q, T_k)
+        
+        # Key Masking
+        key_mask = torch.sign(torch.abs(keys.sum(dim=-1))).repeat(self.num_heads, 1)  # (h*N, T_k)
+        key_mask_reshaped = key_mask.unsqueeze(1).repeat(1, queries.shape[1], 1)  # (h*N, T_q, T_k)
+        key_paddings = torch.ones_like(matmul_output) * (-2 ** 32 + 1)
+        matmul_output_m1 = torch.where(torch.eq(key_mask_reshaped, 0), key_paddings, matmul_output)  # (h*N, T_q, T_k)
+        
+        # Causality - Future Blinding
+        diag_vals = torch.ones_like(matmul_output[0, :, :])   # (T_q, T_k)
+        tril = torch.tril(diag_vals)  # (T_q, T_k)
+        causality_mask = tril.unsqueeze(0).repeat(matmul_output.shape[0], 1, 1)  # (h*N, T_q, T_k)
+        causality_paddings = torch.ones_like(causality_mask) * (-2 ** 32 + 1)
+        matmul_output_m2 = torch.where(torch.eq(causality_mask, 0), causality_paddings, matmul_output_m1)  # (h*N, T_q, T_k)
+        
+        # Activation
+        matmul_output_sm = self.softmax(matmul_output_m2)  # (h*N, T_q, T_k)
+        
+        # Query Masking
+        query_mask = torch.sign(torch.abs(queries.sum(dim=-1))).repeat(self.num_heads, 1)  # (h*N, T_q)
+        query_mask = query_mask.unsqueeze(-1).repeat(1, 1, keys.shape[1])  # (h*N, T_q, T_k)
+        matmul_output_qm = matmul_output_sm * query_mask
+        
+        # Dropout
+        matmul_output_dropout = self.dropout(matmul_output_qm)
+        
+        # Weighted Sum
+        output_ws = torch.bmm(matmul_output_dropout, V_)  # ( h*N, T_q, C/h)
+        
+        # Restore Shape
+        output = torch.cat(torch.split(output_ws, output_ws.shape[0] // self.num_heads, dim=0), dim=2)  # (N, T_q, C)
+        
+        # Residual Connection
+        output_res = output + queries
+        
+        return output_res
+
+class SASRec(nn.Module):
+    def __init__(self, hidden_size, item_num, state_size, dropout, device, num_heads=1):
+        super().__init__()
+        self.state_size = state_size
+        self.hidden_size = hidden_size
+        self.item_num = int(item_num)
+        self.dropout = nn.Dropout(dropout)
+        self.device = device
+        self.item_embeddings = nn.Embedding(
+            num_embeddings=item_num + 1,
+            embedding_dim=hidden_size,
+        )
+        nn.init.normal_(self.item_embeddings.weight, 0, 1)
+        self.positional_embeddings = nn.Embedding(
+            num_embeddings=state_size,
+            embedding_dim=hidden_size
+        )
+        # emb_dropout is added
+        self.emb_dropout = nn.Dropout(dropout)
+        self.ln_1 = nn.LayerNorm(hidden_size)
+        self.ln_2 = nn.LayerNorm(hidden_size)
+        self.ln_3 = nn.LayerNorm(hidden_size)
+        self.mh_attn = MultiHeadAttention(hidden_size, hidden_size, num_heads, dropout)
+        self.feed_forward = PositionwiseFeedForward(hidden_size, hidden_size, dropout)
+        self.s_fc = nn.Linear(hidden_size, item_num)
+        # self.ac_func = nn.ReLU()
+
+    def forward(self, states, len_states):
+        # inputs_emb = self.item_embeddings(states) * self.item_embeddings.embedding_dim ** 0.5
+        inputs_emb = self.item_embeddings(states)
+        inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
+        seq = self.emb_dropout(inputs_emb)
+        mask = torch.ne(states, self.item_num).float().unsqueeze(-1).to(self.device)
+        seq *= mask
+        seq_normalized = self.ln_1(seq)
+        mh_attn_out = self.mh_attn(seq_normalized, seq)
+        ff_out = self.feed_forward(self.ln_2(mh_attn_out))
+        ff_out *= mask
+        ff_out = self.ln_3(ff_out)
+        state_hidden = extract_axis_1(ff_out, len_states - 1)
+        supervised_output = self.s_fc(state_hidden).squeeze()
+        return supervised_output
+
+    def forward_eval(self, states, len_states):
+        # inputs_emb = self.item_embeddings(states) * self.item_embeddings.embedding_dim ** 0.5
+        inputs_emb = self.item_embeddings(states)
+        inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
+        seq = self.emb_dropout(inputs_emb)
+        mask = torch.ne(states, self.item_num).float().unsqueeze(-1).to(self.device)
+        seq *= mask
+        seq_normalized = self.ln_1(seq)
+        mh_attn_out = self.mh_attn(seq_normalized, seq)
+        ff_out = self.feed_forward(self.ln_2(mh_attn_out))
+        ff_out *= mask
+        ff_out = self.ln_3(ff_out)
+        state_hidden = extract_axis_1(ff_out, len_states - 1)
+        supervised_output = self.s_fc(state_hidden).squeeze()
+        return supervised_output
     
-    avg_hit_rate = (h1_rate + h3_rate + h5_rate) / 3
+    def cacul_h(self, states, len_states):
+        # inputs_emb = self.item_embeddings(states) * self.item_embeddings.embedding_dim ** 0.5
+        inputs_emb = self.item_embeddings(states)
+        inputs_emb += self.positional_embeddings(torch.arange(self.state_size).to(self.device))
+        seq = self.emb_dropout(inputs_emb)
+        mask = torch.ne(states, self.item_num).float().unsqueeze(-1).to(self.device)
+        seq *= mask
+        seq_normalized = self.ln_1(seq)
+        mh_attn_out = self.mh_attn(seq_normalized, seq)
+        ff_out = self.feed_forward(self.ln_2(mh_attn_out))
+        ff_out *= mask
+        ff_out = self.ln_3(ff_out)
+        state_hidden = extract_axis_1(ff_out, len_states - 1)
+
+        return state_hidden
     
-    result_data = {
-        "type": "recommendation",
-        "metrics": {
-            "top_1_hit_rate": h1_rate,
-            "top_3_hit_rate": h3_rate,
-            "top_5_hit_rate": h5_rate,
-            "average_hit_rate": avg_hit_rate,
-            "total_scenarios": total_samples,
-            "top_1_hits": h1_count,
-            "top_3_hits": h3_count,
-            "top_5_hits": h5_count,
-            "ndcg@5": ndcg5_score,
-        },
-        "data_info": {
-            "evaluated_count": total_samples,
-            "original_simulation_count": total_samples,
-            "original_ground_truth_count": total_samples
-        }
-    }
+    def cacu_x(self, x):
+        x = self.item_embeddings(x)
 
-
-    try:
-        output_dir = os.path.dirname(args.result_file)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir, exist_ok=True)
-
-        with open(args.result_file, 'w', encoding='utf-8') as f:
-            json.dump(result_data, f, indent=4, ensure_ascii=False)
-        print(f"\n📊 Save Detail Results in File : {args.result_file}")
-    except Exception as e:
-        print(f"\n❌ Error while saving file, summary: {e}")
-
-"""
-API Request
-"""
-
-def api_request(system_prompt, user_prompt, args, few_shot=None):
-    return gpt_api(system_prompt, user_prompt, args, few_shot)
-
-def gpt_api(system_prompt, user_prompt, args, few_shot=None):
-    retry_count = 0
-    max_retry_num = args.max_retry_num
-
-    # url = "https://api.openai.com/v1/chat/completions"
-    if hasattr(args, 'base_url') and args.base_url:
-        # Đảm bảo url kết thúc bằng /chat/completions
-        url = f"{args.base_url.rstrip('/')}/chat/completions"
-    else:
-        url = "https://api.openai.com/v1/chat/completions"
-
-    api_key = args.api_key.strip('"') if args.api_key else "EMPTY"
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-    ]
-
-    if few_shot is not None:
-        if isinstance(few_shot, list):
-            messages.extend(few_shot)
-        elif isinstance(few_shot, str):
-            messages.append({"role": "user", "content": few_shot})
-        else:
-            messages.append({"role": "user", "content": str(few_shot)})
-
-    messages.append({"role": "user", "content": user_prompt})
-
-    payload = {
-        "model": args.model,
-        "messages": messages,
-        "temperature": args.temperature,
-    }
-
-    while retry_count < max_retry_num:
-        request_result = None
-        try:
-            request_result = requests.post(url, headers=headers, json=payload, timeout=30)
-
-            if request_result.status_code != 200:
-                result_json = request_result.json()
-                error_message = result_json.get('error', {}).get('message', f"Unknown HTTP error {request_result.status_code}")
-                print(f"[ERROR] API Call Failed (Status: {request_result.status_code}, Retry: {retry_count+1}/{max_retry_num}): {error_message}")
-
-                if request_result.status_code == 401:
-                    print("[FATAL] API Key Unauthorized (401). Exiting retries.")
-                    return None
-
-                raise Exception(error_message)
-
-            result_json = request_result.json()
-            if 'error' not in result_json:
-                model_output = result_json['choices'][0]['message']['content']
-
-
-                return model_output.strip()
-            else:
-                error_message = result_json.get('error', {}).get('message', "Internal API error.")
-                print(f"[ERROR] API Response Error (Retry: {retry_count+1}/{max_retry_num}): {error_message}")
-                raise Exception(error_message)
-
-        except requests.exceptions.Timeout:
-            print(f"[WARNING] Request Timeout (Retry: {retry_count+1}/{max_retry_num}). Retrying...")
-
-        except requests.exceptions.RequestException as req_e:
-            print(f"[WARNING] Network/Connection Error (Retry: {retry_count+1}/{max_retry_num}): {req_e}")
-
-        except Exception as e:
-            print(f"[WARNING] General Error (Retry: {retry_count+1}/{max_retry_num}): {e}")
-
-        retry_count += 1
-        if retry_count < max_retry_num:
-            time.sleep(min(2 ** retry_count, 10))
-
-    return None
-
-"""
-Main split functions
-"""
-
-def split_rec_reponse(response):
-    """Parse rec-agent response dạng Item: <single item>."""
-    if response is None:
-        print("[split_rec_reponse] response is None")
-        return None, None
-    response = str(response) + '\n'
-    pattern = r'Reason: (.*?)\nItem: (.*?)\n'
-    matches = re.findall(pattern, response, re.DOTALL)
-    if len(matches) != 1:
-        print("[split_rec_reponse] cannot split, response =", response)
-        return None, None
-    return matches[0][0].strip(), matches[0][1].strip()
-
-
-def split_user_response(response):
-    """Parse user-agent response dạng Decision: yes/no."""
-    if response is None:
-        print("[split_user_response] response is None")
-        return None, None
-    response = str(response) + '\n'
-    pattern = r'Reason: (.*?)\nDecision: (.*?)\n'
-    matches = re.findall(pattern, response, re.DOTALL)
-    if len(matches) != 1:
-        print("[split_user_response] cannot split, response =", response)
-        return None, None
-    reason, decision = matches[0][0].strip(), matches[0][1].strip().lower()
-    if decision.startswith('yes'):
-        return reason, True
-    elif decision.startswith('no'):
-        return reason, False
-    print("[split_user_response] cannot find flag, response =", response)
-    return None, None
-
-"""
-Read And Write Process
-"""
-
-def read_jsonl(file_path):
-    data_list = []
-    with open(file_path, "r", encoding='utf-8') as file:
-        for line in file:
-            line = line.strip() 
-            if line: 
-                json_data = json.loads(line)
-                data_list.append(json_data)
-    return data_list
-
-def write_jsonl(file_path, data_list):
-    with open(file_path, 'w', encoding='utf-8') as f:
-        for data in data_list:
-    
-            line = json.dumps(data, ensure_ascii=False)
-            f.write(line + '\n')
-            
-def append_jsonl(file_path, data):
-    parent_dir = os.path.dirname(file_path)
-    if parent_dir and not os.path.exists(parent_dir):
-        os.makedirs(parent_dir, exist_ok=True)
-
-    with open(file_path, 'a', encoding='utf-8') as f:
-        line = json.dumps(data, ensure_ascii=False)
-        f.write(line + '\n')
-
-def read_json(file_path):
-    with open(file_path, 'r', encoding='utf-8') as json_file: 
-        data_list = json.load(json_file)
-    return data_list
-            
-def write_json(file_path, data_list):
-    with open(file_path, 'w', encoding='utf-8') as file:
-        json.dump(data_list, file, ensure_ascii=False, indent=4)  
+        return x

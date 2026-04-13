@@ -1,86 +1,143 @@
+import os
+import json
+import time
+import requests
 import re
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+"""
+Save Final Metrics
+"""
 
-def _clean_item_name(name: str) -> str:
-    """Xóa phần description thừa sau tên item.
+def save_final_metrics(args, total_samples, h1_count, h3_count, h5_count, ndcg5_score):
     
-    Một số format model hay trả về:
-      "Grandma Stinks! - Since this book was..."   → "Grandma Stinks!"
-      "Peter Nimble (#1) - This book falls into..."→ "Peter Nimble (#1)"
-      "Some Book: subtitle - description here"     → "Some Book: subtitle"
+    h1_rate = h1_count / total_samples if total_samples > 0 else 0
+    h3_rate = h3_count / total_samples if total_samples > 0 else 0
+    h5_rate = h5_count / total_samples if total_samples > 0 else 0
     
-    Quy tắc: cắt tại dấu " - " ĐẦU TIÊN nếu phần sau nó dài (> 15 ký tự),
-    tức là đó là description chứ không phải một phần tên sách.
-    """
-    # Tìm " - " đầu tiên
-    dash_pos = name.find(' - ')
-    if dash_pos != -1:
-        suffix = name[dash_pos + 3:].strip()
-        # Nếu phần sau dấu " - " dài → đó là description, cắt bỏ
-        if len(suffix) > 15:
-            return name[:dash_pos].strip()
-    return name.strip()
+    avg_hit_rate = (h1_rate + h3_rate + h5_rate) / 3
+    
+    result_data = {
+        "type": "recommendation",
+        "metrics": {
+            "top_1_hit_rate": h1_rate,
+            "top_3_hit_rate": h3_rate,
+            "top_5_hit_rate": h5_rate,
+            "average_hit_rate": avg_hit_rate,
+            "total_scenarios": total_samples,
+            "top_1_hits": h1_count,
+            "top_3_hits": h3_count,
+            "top_5_hits": h5_count,
+            "ndcg@5": ndcg5_score,
+        },
+        "data_info": {
+            "evaluated_count": total_samples,
+            "original_simulation_count": total_samples,
+            "original_ground_truth_count": total_samples
+        }
+    }
 
 
-def _parse_item_block(items_block: str) -> list:
-    """Parse item block thành list, hỗ trợ 3 format:
-      1. Đánh số dòng :  "1. Item"  hoặc  "1) Item"
-      2. Dấu gạch đầu :  "- Item"
-      3. Phẳng (comma) :  "Item1, Item2, Item3"
-    """
-    items_block = items_block.strip()
+    try:
+        output_dir = os.path.dirname(args.result_file)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
 
-    # Format 1: numbered lines
-    numbered = re.findall(r'^\d+[.)]\s*(.+)', items_block, re.MULTILINE)
-    if numbered:
-        return [_clean_item_name(i) for i in numbered if i.strip()]
+        with open(args.result_file, 'w', encoding='utf-8') as f:
+            json.dump(result_data, f, indent=4, ensure_ascii=False)
+        print(f"\n📊 Save Detail Results in File : {args.result_file}")
+    except Exception as e:
+        print(f"\n❌ Error while saving file, summary: {e}")
 
-    # Format 2: bullet lines
-    bulleted = re.findall(r'^[-*•]\s*(.+)', items_block, re.MULTILINE)
-    if bulleted:
-        return [_clean_item_name(i) for i in bulleted if i.strip()]
+"""
+API Request
+"""
 
-    # Format 3: comma-separated (kể cả cùng 1 dòng hoặc nhiều dòng)
-    flat = [_clean_item_name(i) for i in items_block.replace('\n', ',').split(',') if i.strip()]
-    return flat
+def api_request(system_prompt, user_prompt, args, few_shot=None):
+    return gpt_api(system_prompt, user_prompt, args, few_shot)
+
+def gpt_api(system_prompt, user_prompt, args, few_shot=None):
+    retry_count = 0
+    max_retry_num = args.max_retry_num
+
+    # url = "https://api.openai.com/v1/chat/completions"
+    if hasattr(args, 'base_url') and args.base_url:
+        # Đảm bảo url kết thúc bằng /chat/completions
+        url = f"{args.base_url.rstrip('/')}/chat/completions"
+    else:
+        url = "https://api.openai.com/v1/chat/completions"
+
+    api_key = args.api_key.strip('"') if args.api_key else "EMPTY"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+
+    if few_shot is not None:
+        if isinstance(few_shot, list):
+            messages.extend(few_shot)
+        elif isinstance(few_shot, str):
+            messages.append({"role": "user", "content": few_shot})
+        else:
+            messages.append({"role": "user", "content": str(few_shot)})
+
+    messages.append({"role": "user", "content": user_prompt})
+
+    payload = {
+        "model": args.model,
+        "messages": messages,
+        "temperature": args.temperature,
+    }
+
+    while retry_count < max_retry_num:
+        request_result = None
+        try:
+            request_result = requests.post(url, headers=headers, json=payload, timeout=120)
+
+            if request_result.status_code != 200:
+                result_json = request_result.json()
+                error_message = result_json.get('error', {}).get('message', f"Unknown HTTP error {request_result.status_code}")
+                print(f"[ERROR] API Call Failed (Status: {request_result.status_code}, Retry: {retry_count+1}/{max_retry_num}): {error_message}")
+
+                if request_result.status_code == 401:
+                    print("[FATAL] API Key Unauthorized (401). Exiting retries.")
+                    return None
+
+                raise Exception(error_message)
+
+            result_json = request_result.json()
+            if 'error' not in result_json:
+                model_output = result_json['choices'][0]['message']['content']
 
 
-# ---------------------------------------------------------------------------
-# Main split functions
-# ---------------------------------------------------------------------------
+                return model_output.strip()
+            else:
+                error_message = result_json.get('error', {}).get('message', "Internal API error.")
+                print(f"[ERROR] API Response Error (Retry: {retry_count+1}/{max_retry_num}): {error_message}")
+                raise Exception(error_message)
 
-def split_rec_reponse_top_n(response):
-    """Parse rec-agent response dạng:
-        Reason: <text>
-        Items: <item1>, <item2>, ...   (hoặc dạng đánh số, bullet)
-    Trả về (reason: str, item_list: list) hoặc (None, None) nếu thất bại.
-    """
-    if response is None:
-        return None, None
+        except requests.exceptions.Timeout:
+            print(f"[WARNING] Request Timeout (Retry: {retry_count+1}/{max_retry_num}). Retrying...")
 
-    response = str(response).strip()
+        except requests.exceptions.RequestException as req_e:
+            print(f"[WARNING] Network/Connection Error (Retry: {retry_count+1}/{max_retry_num}): {req_e}")
 
-    # --- Tách Reason ---
-    reason = None
-    reason_match = re.search(r'Reason:\s*(.*?)(?=\nItems?:)', response, re.DOTALL | re.IGNORECASE)
-    if reason_match:
-        reason = reason_match.group(1).strip()
+        except Exception as e:
+            print(f"[WARNING] General Error (Retry: {retry_count+1}/{max_retry_num}): {e}")
 
-    # --- Tách Items block ---
-    items_match = re.search(r'Items?:\s*(.*)', response, re.DOTALL | re.IGNORECASE)
-    item_list = []
-    if items_match:
-        item_list = _parse_item_block(items_match.group(1))
+        retry_count += 1
+        if retry_count < max_retry_num:
+            time.sleep(min(2 ** retry_count, 10))
 
-    if not reason or not item_list:
-        print("[split_rec_reponse_top_n] Cannot split, response =", response)
-        return None, None
+    return None
 
-    return reason, item_list
-
+"""
+Main split functions
+"""
 
 def split_rec_reponse(response):
     """Parse rec-agent response dạng Item: <single item>."""
@@ -115,100 +172,41 @@ def split_user_response(response):
     print("[split_user_response] cannot find flag, response =", response)
     return None, None
 
+"""
+Read And Write Process
+"""
 
-def split_user_rec_reponse(response):
-    if response is None:
-        print("[split_user_rec_reponse] response is None")
-        return None, None
-    response = str(response) + '\n'
-    pattern = r'Reason: (.*?)\nItem: (.*?)\n'
-    matches = re.findall(pattern, response, re.DOTALL)
-    if len(matches) != 1:
-        print("[split_user_rec_reponse] cannot split, response =", response)
-        return None, None
-    return matches[0][0].strip(), matches[0][1].strip()
+def read_jsonl(file_path):
+    data_list = []
+    with open(file_path, "r", encoding='utf-8') as file:
+        for line in file:
+            line = line.strip() 
+            if line: 
+                json_data = json.loads(line)
+                data_list.append(json_data)
+    return data_list
 
+def write_jsonl(file_path, data_list):
+    with open(file_path, 'w', encoding='utf-8') as f:
+        for data in data_list:
+    
+            line = json.dumps(data, ensure_ascii=False)
+            f.write(line + '\n')
+            
+def append_jsonl(file_path, data):
+    parent_dir = os.path.dirname(file_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir, exist_ok=True)
 
-def split_user_ab_response(response):
-    if response is None:
-        print("[split_user_ab_response] response is None")
-        return None, None
-    response = str(response) + '\n'
-    pattern = r'Reason: (.*?)\nDecision: (.*?)\n'
-    matches = re.findall(pattern, response, re.DOTALL)
-    if len(matches) != 1:
-        print("[split_user_ab_response] cannot split, response =", response)
-        return None, None
-    reason, decision = matches[0][0].strip(), matches[0][1].strip().lower()
-    if decision.startswith('yes'):
-        return reason, 1
-    elif decision.startswith('no'):
-        return reason, 0
-    print("[split_user_ab_response] cannot find flag, response =", response)
-    return None, None
+    with open(file_path, 'a', encoding='utf-8') as f:
+        line = json.dumps(data, ensure_ascii=False)
+        f.write(line + '\n')
 
-
-def split_prior_rec_response(response):
-    if response is None:
-        print("[split_prior_rec_response] response is None")
-        return None
-    response = str(response) + '\n'
-    pattern = r'Item: (.*?)\n'
-    matches = re.findall(pattern, response, re.DOTALL)
-    if len(matches) != 1:
-        print("[split_prior_rec_response] cannot split, response =", response)
-        return None
-    return matches[0].strip()
-
-
-def split_prior_llama3_response(response):
-    if response is None:
-        print("[split_prior_llama3_response] response is None")
-        return None
-    pattern = r'Item: (.*?)<\|eot_id\|>'
-    matches = re.findall(str(response), re.DOTALL)
-    if len(matches) != 1:
-        print("[split_prior_llama3_response] cannot split via eot, trying fallback")
-        return split_prior_rec_response(response)
-    return matches[0].strip()
-
-
-# ---------------------------------------------------------------------------
-# Strategy 3: Dynamic Sequence Augmentation helper
-# ---------------------------------------------------------------------------
-
-def extract_positive_mentions(user_reason, rec_item_list, max_items=2):
-    """Trích xuất items mà user có thái độ tích cực trong lý do từ chối.
-
-    Trả về list tên item (len <= max_items).
-    """
-    if not user_reason or not rec_item_list:
-        return []
-
-    NEGATIVE_QUALIFIERS = [
-        "not what i", "don't want", "not interested", "completely wrong",
-        "irrelevant", "not relevant", "nothing to do", "not related",
-        "dislike", "hate",
-    ]
-
-    reason_lower = user_reason.lower()
-    mentioned = []
-
-    for item_name in rec_item_list:
-        item_lower = item_name.lower().strip()
-        if not item_lower or item_lower not in reason_lower:
-            continue
-        pos = reason_lower.index(item_lower)
-        window = reason_lower[max(0, pos - 80): pos + len(item_lower) + 40]
-        if not any(neg in window for neg in NEGATIVE_QUALIFIERS):
-            mentioned.append(item_name)
-
-    # Deduplicate
-    seen, unique = set(), []
-    for item in mentioned:
-        key = item.lower().strip()
-        if key not in seen:
-            seen.add(key)
-            unique.append(item)
-
-    return unique[:max_items] if unique else [rec_item_list[0]]
+def read_json(file_path):
+    with open(file_path, 'r', encoding='utf-8') as json_file: 
+        data_list = json.load(json_file)
+    return data_list
+            
+def write_json(file_path, data_list):
+    with open(file_path, 'w', encoding='utf-8') as file:
+        json.dump(data_list, file, ensure_ascii=False, indent=4)  

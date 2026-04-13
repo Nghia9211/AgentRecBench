@@ -4,19 +4,12 @@ from tqdm import tqdm
 
 
 def build_candidate_order(candidate_dir):
-    """
-    Tạo mapping: user_id → thứ tự (index) theo số thứ tự file trong candidate_dir.
-    task_0.json → 0, task_1.json → 1, ..., task_99.json → 99
-    
-    Dùng để sort merge_data_list cho khớp thứ tự candidate dir.
-    """
     order_map = {}
     if not candidate_dir or not os.path.exists(candidate_dir):
         return order_map
 
     candidate_files = [f for f in os.listdir(candidate_dir)
                        if f.startswith('task_') and f.endswith('.json')]
-    # Sort theo số trong tên file: task_0, task_1, ..., task_100
     candidate_files.sort(key=lambda f: int(f.replace('task_', '').replace('.json', '')))
 
     for idx, file_name in enumerate(candidate_files):
@@ -91,17 +84,14 @@ def prepare_merge_data(new_input_list, data_map, candidate_map, item_id_to_name_
             for rid in candidate_map[user_id]:
                 rid_str = str(rid).strip()
                 
-                # Tìm tên
                 name = item_id_to_name_map.get(rid_str) or user_agent_sasrec.id2name.get(int(rid_str) if rid_str.isdigit() else -1) or rid_str
                 
-                # Tìm ID trong mô hình SASRec
                 iid = user_agent_sasrec.name2id.get(name)
                 
                 # --- DEBUG CANDIDATES ---
                 if iid is None:
-                    # ĐÂY LÀ NGUYÊN NHÂN GÂY LỖI: Item có trong danh sách ứng viên nhưng mô hình không biết nó là gì
                     print(f"[MISSING ITEM] Item '{name}' (ID: {rid_str}) không có trong từ điển Model. Sẽ bị loại bỏ khỏi cans.")
-                    continue # Bỏ qua item này, không thêm vào new_ids
+                    continue 
                 
                 if iid >= user_agent_sasrec.item_num:
                     print(f"[INVALID ID] Item '{name}' có ID {iid} >= item_num {user_agent_sasrec.item_num}. Sẽ bị loại bỏ.")
@@ -110,7 +100,6 @@ def prepare_merge_data(new_input_list, data_map, candidate_map, item_id_to_name_
                 new_names.append(name)
                 new_ids.append(iid)
             
-            # Kiểm tra nếu sau khi lọc không còn ứng viên nào
             if len(new_ids) == 0:
                 print(f"[WARNING] User {user_id} không có ứng viên nào hợp lệ sau khi lọc!")
                 skipped += 1
@@ -128,7 +117,6 @@ def prepare_merge_data(new_input_list, data_map, candidate_map, item_id_to_name_
             data['prior_answer'] = user_agent_sasrec.model_generate(data['seq'], data['len_seq'], data['cans'])
             merge_data_list.append(data)
         except Exception as e:
-            # In chi tiết lỗi tại đây
             print(f"\n[ERROR] Lỗi tại model_generate cho User {user_id}: {e}")
             print(f"Dữ liệu gây lỗi - Cans: {data.get('cans')}, Item_num: {user_agent_sasrec.item_num}")
             skipped += 1

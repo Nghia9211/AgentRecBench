@@ -1,8 +1,6 @@
 """
 moe_fusion/reranker.py
 ───────────────────────
-Feedback Loop 4.0: 
-  - LLM Reranker được phép chọn lại item cũ nếu nó cho rằng User Simulator sai lầm.
 """
 
 import json
@@ -10,9 +8,11 @@ import re
 import traceback
 from typing import Dict, List, Tuple
 import numpy as np
+import math
 
 def rank_to_score(ranked_list: List[str]) -> Dict[str, float]:
-    return {item: 1.0 / (rank + 1) for rank, item in enumerate(ranked_list)}
+    # Score NDCG: 1.0, 0.63, 0.5, 0.43, 0.38...
+    return {item: 1.0 / math.log2(rank + 2) for rank, item in enumerate(ranked_list)}
 
 def _build_user_query(data: dict) -> str:
     parts = []

@@ -1,16 +1,6 @@
 """
 moe_fusion/score_combiner.py
 ─────────────────────────────
-Score Combiner (Final Pre-feedback Score):
-    s1(u, i) = alpha * s0(u, i) + (1 - alpha) * s_rerank(u, i)
-    C_K      = TopK(s1)
-
-Fix (Feedback Loop):
-  - alpha giờ nhận thêm `epoch` để tăng dần theo round:
-      Round 1: khám phá → alpha thấp hơn (trust reranker)
-      Round 2+: khai thác → alpha cao hơn (trust MoE base)
-  - Cold-start penalty vẫn giữ nguyên.
-  - Confidence bonus vẫn giữ nguyên.
 """
 
 import numpy as np
@@ -33,11 +23,6 @@ def _zscore_normalize(score_dict: Dict[str, float]) -> Dict[str, float]:
 
 
 def _sasrec_confidence(fused_scores: Dict[str, float]) -> float:
-    """
-    Tính confidence của MoE base score (s0):
-    margin = (top1 - top2) / (top1 - min)
-    Confidence cao → alpha tăng (tin MoE base hơn).
-    """
     if len(fused_scores) < 2:
         return 1.0
     sorted_vals = sorted(fused_scores.values(), reverse=True)
@@ -54,21 +39,6 @@ def _sasrec_confidence(fused_scores: Dict[str, float]) -> float:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ScoreCombiner:
-    """
-    Kết hợp s0 (MoE fusion) và s_rerank (Reranker) thành s1,
-    rồi chọn C_K = TopK(s1) làm final recommendation list.
-
-    s1(u, i) = alpha * s0(u, i) + (1 - alpha) * s_rerank(u, i)
-    C_K      = TopK(s1)
-
-    Feedback loop fix:
-      - get_alpha() nhận thêm `epoch` (round hiện tại trong dialogue).
-      - Mỗi round tăng alpha thêm `epoch_alpha_boost` (mặc định 0.05).
-      - Ý nghĩa: round đầu khám phá (reranker dẫn dắt), round sau
-        khai thác (MoE base đã được validate → tin hơn).
-    """
-
-    # Boost alpha mỗi round thêm dialogue (feedback loop)
     EPOCH_ALPHA_BOOST: float = 0.00
 
     def __init__(self, cfg: ScoreConfig = None):
@@ -76,8 +46,8 @@ class ScoreCombiner:
 
     # ─────────────────────────────────────────────────────────────────────
     # Alpha selection
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ───────────────── ────────────────────────────────────────────────────
+    "Apdative for future work"
     def get_alpha(
         self,
         dataset:       str,
@@ -85,22 +55,8 @@ class ScoreCombiner:
         fused_scores:  Dict[str, float] = None,
         epoch:         int = 1,
     ) -> float:
-        """
-        Chọn alpha (weight của s0) theo:
-          - Dataset (dense/sparse)
-          - Cold-start (len_seq ngắn)
-          - Confidence của s0 (nếu có fused_scores)
-          - Epoch (round trong dialogue — FIX feedback loop)
-
-        alpha cao → tin MoE base hơn
-        alpha thấp → tin reranker hơn
-
-        Epoch logic:
-          Round 1: chưa có user feedback → dùng base alpha (khám phá)
-          Round 2+: đã biết user thích gì → tăng trust MoE base (khai thác)
-        """
         if not self.cfg.use_adaptive_alpha:
-            # Non-adaptive: vẫn áp dụng epoch boost nhẹ
+            # Non-adaptive
             base = self.cfg.alpha
             epoch_boost = (epoch - 1) * self.EPOCH_ALPHA_BOOST
             return float(np.clip(base + epoch_boost, 0.1, 0.9))
@@ -108,14 +64,13 @@ class ScoreCombiner:
         # ── Base alpha theo dataset ───────────────────────────────────────
         alpha = self.cfg.dataset_alpha.get(dataset, self.cfg.alpha)
 
-        # ── Confidence bonus (nếu có fused_scores) ───────────────────────
+        # ── Confidence bonus ───────────────────────
         if fused_scores:
             confidence = _sasrec_confidence(fused_scores)
             conf_bonus = (confidence - 0.5) * 0.1   # [-0.05, +0.05]
             alpha     += conf_bonus
 
         # ── Epoch boost (feedback loop fix) ──────────────────────────────
-        # Round 1 → +0.00, Round 2 → +0.05, Round 3 → +0.10
         epoch_boost = (epoch - 1) * self.EPOCH_ALPHA_BOOST
         alpha      += epoch_boost
 
@@ -138,26 +93,9 @@ class ScoreCombiner:
         top_k:          int  = None,
         epoch:          int  = 1,
     ) -> Tuple[List[str], Dict[str, float], dict]:
-        """
-        Kết hợp s0 và s_rerank → s1, chọn C_K = TopK(s1).
-
-        Args:
-            fused_scores:   Dict[item_name → s0]  (từ MoEFusion)
-            rerank_scores:  Dict[item_name → s_rerank]  (từ Reranker)
-            dataset:        'yelp' | 'amazon' | 'goodreads'
-            len_seq:        độ dài user history
-            top_k:          số items trả về (default: cfg.retrieval.top_K)
-            epoch:          round hiện tại trong dialogue (1-indexed)
-
-        Returns:
-            c_k:         List[str] — C_K final recommendation list
-            s1_scores:   Dict[str, float] — s1 cho mỗi item
-            debug_info:  dict
-        """
         top_k = top_k or DEFAULT_CONFIG.retrieval.top_K
 
         if not fused_scores:
-            # Fallback: chỉ dùng rerank
             c_k = sorted(rerank_scores, key=rerank_scores.get, reverse=True)[:top_k]
             return c_k, rerank_scores, {'alpha': 0.0, 'fallback': True}
 
@@ -205,12 +143,6 @@ class ScoreCombiner:
         top_k:         int = None,
         epoch:         int = 1,
     ) -> Tuple[List[str], Dict[str, float], dict]:
-        """
-        Convenience wrapper: auto-detect dataset và len_seq từ data dict.
-
-        Args:
-            epoch: round hiện tại trong dialogue loop (mới thêm cho FL fix)
-        """
         dataset = next(
             (d for d in ['yelp', 'amazon', 'goodreads']
              if d in getattr(args, 'data_dir', '')),
