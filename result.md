@@ -32,12 +32,10 @@ NDCG evaluates the ranking quality by assigning higher importance to hits at hig
 
 $$
 DCG@K = \sum_{i=1}^{K} \frac{rel_i}{\log_2(i + 1)}
-
 $$
 
 $$
 IDCG@K = \sum_{i=1}^{|REL_K|} \frac{rel_i}{\log_2(i + 1)}
-
 $$
 
 $$
