@@ -32,12 +32,10 @@ NDCG evaluates the ranking quality by assigning higher importance to hits at hig
 
 $$
 DCG@K = \sum_{i=1}^{K} \frac{rel_i}{\log_2(i + 1)}
-
 $$
 
 $$
 IDCG@K = \sum_{i=1}^{|REL_K|} \frac{rel_i}{\log_2(i + 1)}
-
 $$
 
 $$
@@ -102,4 +100,8 @@ Where:
 | DummyAgent  | 0.2899     | 0.2892        | 0.3329     |
 | RecHacker   | 0.4240     | 0.4388        | 0.3254     |
 | Baseline666 | 0.2977     | 0.3755        | 0.2986     |
+<<<<<<< HEAD
 | MoE         | **0.7250** | **0.7080**    | **0.7653** |
+=======
+| MoE         | -          | -             | -          |
+>>>>>>> 7088ba1abb58860e35916f146fb5dcdd99591a6a
